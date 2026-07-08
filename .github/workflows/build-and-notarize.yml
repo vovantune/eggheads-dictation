@@ -1,4 +1,4 @@
-name: Build and Notarize
+name: Baseline Unsigned Desktop Builds
 
 on:
   push:
