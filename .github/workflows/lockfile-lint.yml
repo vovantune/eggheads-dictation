@@ -2,6 +2,7 @@ name: Lockfile Lint
 
 on:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   lockfile-lint:

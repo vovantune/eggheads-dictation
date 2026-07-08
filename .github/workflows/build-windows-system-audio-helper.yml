@@ -1,12 +1,6 @@
 name: Build Windows System Audio Helper
 
 on:
-  push:
-    paths:
-      - 'resources/windows-system-audio-helper.c'
-      - '.github/workflows/build-windows-system-audio-helper.yml'
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       version:

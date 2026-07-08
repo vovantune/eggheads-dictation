@@ -1,12 +1,6 @@
 name: Build Windows Text Monitor
 
 on:
-  push:
-    paths:
-      - 'resources/windows-text-monitor.c'
-      - '.github/workflows/build-windows-text-monitor.yml'
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       version:

@@ -1,12 +1,6 @@
 name: Build Windows Mic Listener
 
 on:
-  push:
-    paths:
-      - 'resources/windows-mic-listener.c'
-      - '.github/workflows/build-windows-mic-listener.yml'
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       version:
