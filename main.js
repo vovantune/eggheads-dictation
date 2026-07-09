@@ -23,7 +23,6 @@ const {
   BrowserWindow,
   dialog,
   ipcMain,
-  net,
   session,
   systemPreferences,
 } = require("electron");
@@ -52,7 +51,7 @@ const DEFAULT_OAUTH_PROTOCOL_BY_CHANNEL = {
   staging: "openwhispr-staging",
   production: "openwhispr",
 };
-const BASE_WINDOWS_APP_ID = "com.gizmolabs.openwhispr";
+const BASE_WINDOWS_APP_ID = "solutions.eggheads.dictation";
 const DEFAULT_AUTH_BRIDGE_PORT = 5199;
 
 function isElectronBinaryExec() {
@@ -91,7 +90,7 @@ function configureChannelUserDataPath() {
     return;
   }
 
-  const isolatedPath = path.join(app.getPath("appData"), `OpenWhispr-${APP_CHANNEL}`);
+  const isolatedPath = path.join(app.getPath("appData"), `EGGHEADS-Dictation-${APP_CHANNEL}`);
   app.setPath("userData", isolatedPath);
 }
 
@@ -123,7 +122,7 @@ if (process.platform === "linux" && process.env.XDG_SESSION_TYPE === "wayland") 
 // Set desktop filename so Wayland compositors can match windows to the .desktop entry.
 // This allows XDG portals (e.g. PipeWire) to persist permissions across sessions.
 if (process.platform === "linux") {
-  app.setDesktopName("open-whispr.desktop");
+  app.setDesktopName("eggheads-dictation.desktop");
 }
 
 // Group all windows under single taskbar entry on Windows
@@ -242,8 +241,8 @@ if (!gotSingleInstanceLock) {
 const isLiveWindow = (window) => window && !window.isDestroyed();
 
 // Ensure macOS menus use the proper casing for the app name
-if (process.platform === "darwin" && app.getName() !== "OpenWhispr") {
-  app.setName("OpenWhispr");
+if (process.platform === "darwin" && app.getName() !== "EGGHEADS Dictation") {
+  app.setName("EGGHEADS Dictation");
 }
 
 // Add global error handling for uncaught exceptions
@@ -291,6 +290,7 @@ const { i18nMain, changeLanguage } = require("./src/helpers/i18nMain");
 const { ensureYdotool } = require("./src/helpers/ensureYdotool");
 const sidecarRegistry = require("./src/helpers/sidecarRegistry");
 const { reapStaleSidecars } = require("./src/helpers/sidecarReaper");
+const eggheadsAuth = require("./src/helpers/eggheadsAuth");
 
 // Manager instances - initialized after app.whenReady()
 let debugLogger = null;
@@ -338,6 +338,7 @@ function parseAuthBridgePort() {
 const AUTH_BRIDGE_HOST = "127.0.0.1";
 const AUTH_BRIDGE_PORT = parseAuthBridgePort();
 const AUTH_BRIDGE_PATH = "/oauth/callback";
+const EGGHEADS_DICTATION_ONLY = true;
 
 // Set up PATH for production builds to find system tools (whisper.cpp, ffmpeg)
 function setupProductionPath() {
@@ -394,28 +395,32 @@ function initializeCoreManagers() {
   }
   parakeetManager = new ParakeetManager();
   diarizationManager = new DiarizationManager();
-  googleCalendarManager = new GoogleCalendarManager(databaseManager, windowManager);
-  meetingDetectionEngine = new MeetingDetectionEngine(
-    googleCalendarManager,
-    new MeetingProcessDetector(),
-    new AudioActivityDetector(),
-    windowManager,
-    databaseManager
-  );
-  windowManager.meetingDetectionEngine = meetingDetectionEngine;
+  if (!EGGHEADS_DICTATION_ONLY) {
+    googleCalendarManager = new GoogleCalendarManager(databaseManager, windowManager);
+    meetingDetectionEngine = new MeetingDetectionEngine(
+      googleCalendarManager,
+      new MeetingProcessDetector(),
+      new AudioActivityDetector(),
+      windowManager,
+      databaseManager
+    );
+    windowManager.meetingDetectionEngine = meetingDetectionEngine;
+  }
   updateManager = new UpdateManager();
   updateManager.setWindowManager(windowManager);
   windowsKeyManager = new WindowsKeyManager();
   linuxKeyManager = new LinuxKeyManager();
   textEditMonitor = new TextEditMonitor();
-  audioTapManager = new AudioTapManager();
-  linuxPortalAudioManager = new LinuxPortalAudioManager();
-  windowsLoopbackAudioManager = new WindowsLoopbackAudioManager();
-  // Warm the capability cache off the hot path so the first meeting start
-  // doesn't pay the probe spawn. No-ops on non-Windows.
-  windowsLoopbackAudioManager.getCapability().catch(() => {});
+  if (!EGGHEADS_DICTATION_ONLY) {
+    audioTapManager = new AudioTapManager();
+    linuxPortalAudioManager = new LinuxPortalAudioManager();
+    windowsLoopbackAudioManager = new WindowsLoopbackAudioManager();
+    // Warm the capability cache off the hot path so the first meeting start
+    // doesn't pay the probe spawn. No-ops on non-Windows.
+    windowsLoopbackAudioManager.getCapability().catch(() => {});
+    meetingAecManager = new MeetingAecManager();
+  }
   cleanupOrphanedLinuxRestoreToken();
-  meetingAecManager = new MeetingAecManager();
   windowManager.textEditMonitor = textEditMonitor;
   windowManager.windowsKeyManager = windowsKeyManager;
   windowManager.linuxKeyManager = linuxKeyManager;
@@ -447,6 +452,8 @@ function initializeCoreManagers() {
 }
 
 function registerSidecars() {
+  if (EGGHEADS_DICTATION_ONLY) return;
+
   if (whisperManager) sidecarRegistry.register("whisper", () => whisperManager.stopServer());
   if (parakeetManager) sidecarRegistry.register("parakeet", () => parakeetManager.stopServer());
   if (diarizationManager) {
@@ -498,8 +505,10 @@ function initializeDeferredManagers() {
     });
   }
 
-  googleCalendarManager.start();
-  meetingDetectionEngine.start();
+  if (!EGGHEADS_DICTATION_ONLY) {
+    googleCalendarManager.start();
+    meetingDetectionEngine.start();
+  }
 }
 
 app.on("open-url", (event, url) => {
@@ -548,87 +557,14 @@ function handleInvitationDeepLink(deepLinkUrl) {
   }
 }
 
-function resolveAuthUrl() {
-  const fs = require("fs");
-  const envPath = path.join(__dirname, "src", "dist", "runtime-env.json");
-  let runtimeEnv = {};
-  try {
-    if (fs.existsSync(envPath)) runtimeEnv = JSON.parse(fs.readFileSync(envPath, "utf8"));
-  } catch {}
-  return (
-    process.env.AUTH_URL ||
-    process.env.VITE_AUTH_URL ||
-    runtimeEnv.VITE_AUTH_URL ||
-    "https://auth.openwhispr.com"
-  );
-}
-
-function getOauthCookieName() {
-  return process.env.NODE_ENV === "production"
-    ? "__Secure-openwhispr.session_token"
-    : "openwhispr.session_token";
-}
-
-// Older website builds send the signed cookie value as `?token=`; trade it
-// for the raw session.token the bearer plugin expects.
-async function exchangeSignedTokenForRawBearer(signedToken) {
-  try {
-    const res = await net.fetch(`${resolveAuthUrl()}/api/auth/get-session`, {
-      headers: { Cookie: `${getOauthCookieName()}=${signedToken}` },
-      signal: AbortSignal.timeout(5000),
-      useSessionCookies: false,
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data?.session?.token || null;
-  } catch (err) {
-    if (debugLogger) {
-      debugLogger.warn("Signed-token bearer exchange failed (non-fatal)", {
-        error: err?.message,
-      });
-    }
-    return null;
-  }
-}
-
-// One-time bridge for users upgrading from a build that injected the session
-// cookie into Electron's jar: exchange the existing cookie for a raw bearer
-// token, store it, and remove the cookie. Non-fatal — failures fall through
-// to the normal sign-in flow.
-async function migrateCookieToBearerToken() {
-  const tokenStore = require("./src/helpers/tokenStore");
-  if (tokenStore.get()) return;
-
-  const cookieName = getOauthCookieName();
-  const authUrl = resolveAuthUrl();
-
-  try {
-    const cookies = await session.defaultSession.cookies.get({ url: authUrl, name: cookieName });
-    if (!cookies.length) return;
-
-    const rawToken = await exchangeSignedTokenForRawBearer(cookies[0].value);
-    if (!rawToken) return;
-
-    tokenStore.set(rawToken);
-    await session.defaultSession.cookies.remove(authUrl, cookieName);
-    if (debugLogger) debugLogger.debug("Migrated cookie to bearer token");
-  } catch (err) {
-    if (debugLogger) {
-      debugLogger.warn("Cookie→bearer token migration failed (non-fatal)", {
-        error: err?.message,
-      });
-    }
-  }
-}
-
-// Persist the bearer token and reload the control panel so the renderer's
-// authClient sends `Authorization: Bearer <token>` on its next request.
-async function applySessionTokenAndRefresh(token) {
+// Persist the EGGHEADS bearer token and reload the control panel so the
+// renderer sees the signed-in device session on its next request.
+async function applySessionTokenAndRefresh(token, profile = {}) {
   if (!token) return;
   if (!isLiveWindow(windowManager?.controlPanelWindow)) return;
 
   const tokenStore = require("./src/helpers/tokenStore");
-  tokenStore.set(token);
+  tokenStore.setSession(eggheadsAuth.buildSession(token, profile));
 
   const appUrl = DevServerManager.getAppUrl(true);
   if (appUrl) {
@@ -646,6 +582,7 @@ async function applySessionTokenAndRefresh(token) {
       oauthProtocol: OAUTH_PROTOCOL,
     });
   }
+  windowManager.controlPanelWindow.webContents.send("auth-session-changed", tokenStore.getUser());
   windowManager.controlPanelWindow.show();
   windowManager.controlPanelWindow.focus();
 }
@@ -654,14 +591,15 @@ async function handleOAuthDeepLink(deepLinkUrl) {
   try {
     const parsed = new URL(deepLinkUrl);
     const bearerToken = parsed.searchParams.get("bearer_token");
-    if (bearerToken) {
-      void applySessionTokenAndRefresh(bearerToken);
+    if (!eggheadsAuth.isEggheadsToken(bearerToken)) {
+      if (debugLogger) debugLogger.warn("Ignored non-EGGHEADS auth callback token");
       return;
     }
-    const signedToken = parsed.searchParams.get("token");
-    if (!signedToken) return;
-    const rawToken = await exchangeSignedTokenForRawBearer(signedToken);
-    if (rawToken) void applySessionTokenAndRefresh(rawToken);
+    void applySessionTokenAndRefresh(bearerToken, {
+      user_id: parsed.searchParams.get("user_id"),
+      login: parsed.searchParams.get("login"),
+      display_name: parsed.searchParams.get("display_name"),
+    });
   } catch (err) {
     if (debugLogger) debugLogger.error("Failed to handle OAuth deep link:", err);
   }
@@ -725,11 +663,21 @@ function startAuthBridgeServer() {
       return;
     }
 
-    let token = requestUrl.searchParams.get("bearer_token") || requestUrl.searchParams.get("token");
+    let token = requestUrl.searchParams.get("bearer_token");
+    let profile = {
+      user_id: requestUrl.searchParams.get("user_id"),
+      login: requestUrl.searchParams.get("login"),
+      display_name: requestUrl.searchParams.get("display_name"),
+    };
     if (!token && req.method === "POST") {
       try {
         const body = await parseJsonBody(req);
-        token = body?.bearer_token || body?.token || null;
+        token = body?.bearer_token || null;
+        profile = {
+          user_id: body?.user_id,
+          login: body?.login,
+          display_name: body?.display_name,
+        };
       } catch (error) {
         res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
         res.end(error.message || "Invalid request");
@@ -737,17 +685,17 @@ function startAuthBridgeServer() {
       }
     }
 
-    if (!token) {
+    if (!eggheadsAuth.isEggheadsToken(token)) {
       res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
-      res.end("Missing token");
+      res.end("Missing EGGHEADS token");
       return;
     }
 
-    void applySessionTokenAndRefresh(token);
+    void applySessionTokenAndRefresh(token, profile);
 
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(
-      "<html><body><h3>OpenWhispr sign-in complete.</h3><p>You can close this tab.</p></body></html>"
+      "<html><body><h3>EGGHEADS Dictation sign-in complete.</h3><p>You can close this tab.</p></body></html>"
     );
   });
 
@@ -781,30 +729,6 @@ async function startApp() {
     debugLogger.error("CLI bridge failed to start", { error: err.message });
     cliBridge = null;
   });
-
-  await migrateCookieToBearerToken();
-
-  // Electron's file:// renderer sends Origin: null, which Better Auth's
-  // trustedOrigins check rejects. Spoof Origin to the request's own URL so
-  // calls to OpenWhispr's auth and API hosts are treated as same-origin.
-  session.defaultSession.webRequest.onBeforeSendHeaders(
-    {
-      urls: [
-        "https://auth.openwhispr.com/*",
-        "https://api.openwhispr.com/*",
-        "http://localhost:3000/*",
-        "http://127.0.0.1:3000/*",
-      ],
-    },
-    (details, callback) => {
-      try {
-        details.requestHeaders["Origin"] = new URL(details.url).origin;
-      } catch {
-        // malformed URL — leave Origin as-is
-      }
-      callback({ requestHeaders: details.requestHeaders });
-    }
-  );
 
   windowManager.setActivationModeCache(environmentManager.getActivationMode());
   windowManager.setFloatingIconAutoHide(environmentManager.getFloatingIconAutoHide());
@@ -851,55 +775,58 @@ async function startApp() {
     await windowManager.createControlPanelWindow();
   }
 
-  // Create agent window (hidden) and set up agent hotkey
-  await windowManager.createAgentWindow();
+  if (!EGGHEADS_DICTATION_ONLY) {
+    // Create agent window (hidden) and set up agent hotkey
+    await windowManager.createAgentWindow();
 
-  const agentHotkeyCallback = () => {
-    if (hotkeyManager.isInListeningMode()) return;
-    windowManager.toggleAgentOverlay();
-  };
-  windowManager._agentHotkeyCallback = agentHotkeyCallback;
+    const agentHotkeyCallback = () => {
+      if (hotkeyManager.isInListeningMode()) return;
+      windowManager.toggleAgentOverlay();
+    };
+    windowManager._agentHotkeyCallback = agentHotkeyCallback;
 
-  const savedAgentKey = environmentManager.getAgentKey?.() || "";
-  if (savedAgentKey) {
-    const result = await hotkeyManager.registerSlot("agent", savedAgentKey, agentHotkeyCallback);
-    if (!result.success) {
-      debugLogger.warn("Failed to restore agent hotkey", { hotkey: savedAgentKey }, "hotkey");
+    const savedAgentKey = environmentManager.getAgentKey?.() || "";
+    if (savedAgentKey) {
+      const result = await hotkeyManager.registerSlot("agent", savedAgentKey, agentHotkeyCallback);
+      if (!result.success) {
+        debugLogger.warn("Failed to restore agent hotkey", { hotkey: savedAgentKey }, "hotkey");
+      }
     }
-  }
 
-  // Set up voice agent hotkey (dictation routed straight to the dictation
-  // agent, bypassing cleanup)
-  const voiceAgentHotkeyCallback = () => {
-    windowManager.sendToggleVoiceAgent();
-  };
-  windowManager._voiceAgentHotkeyCallback = voiceAgentHotkeyCallback;
+    // Set up voice agent hotkey (dictation routed straight to the dictation
+    // agent, bypassing cleanup)
+    const voiceAgentHotkeyCallback = () => {
+      windowManager.sendToggleVoiceAgent();
+    };
+    windowManager._voiceAgentHotkeyCallback = voiceAgentHotkeyCallback;
 
-  const savedVoiceAgentKey = environmentManager.getVoiceAgentKey?.() || "";
-  if (savedVoiceAgentKey) {
-    const result = await hotkeyManager.registerSlot(
-      "voiceAgent",
-      savedVoiceAgentKey,
-      voiceAgentHotkeyCallback
-    );
-    if (!result.success) {
-      debugLogger.warn(
-        "Failed to restore voice agent hotkey",
-        { hotkey: savedVoiceAgentKey },
-        "hotkey"
+    const savedVoiceAgentKey = environmentManager.getVoiceAgentKey?.() || "";
+    if (savedVoiceAgentKey) {
+      const result = await hotkeyManager.registerSlot(
+        "voiceAgent",
+        savedVoiceAgentKey,
+        voiceAgentHotkeyCallback
       );
+      if (!result.success) {
+        debugLogger.warn(
+          "Failed to restore voice agent hotkey",
+          { hotkey: savedVoiceAgentKey },
+          "hotkey"
+        );
+      }
     }
   }
 
   // Set up meeting mode hotkey
   const meetingHotkeyCallback = () => {
+    if (EGGHEADS_DICTATION_ONLY) return;
     if (hotkeyManager.isInListeningMode()) return;
     debugLogger.info("Meeting hotkey triggered", {}, "meeting");
     meetingDetectionEngine?.startManualMeeting();
   };
 
   const savedMeetingKey = environmentManager.getMeetingKey?.() || "";
-  if (savedMeetingKey) {
+  if (!EGGHEADS_DICTATION_ONLY && savedMeetingKey) {
     const result = await hotkeyManager.registerSlot(
       "meeting",
       savedMeetingKey,
@@ -913,6 +840,15 @@ async function startApp() {
   }
 
   ipcMain.handle("register-meeting-hotkey", async (_event, hotkey) => {
+    if (EGGHEADS_DICTATION_ONLY) {
+      hotkeyManager.unregisterSlot("meeting");
+      environmentManager.saveMeetingKey("");
+      return {
+        success: false,
+        code: "EGGHEADS_DICTATION_ONLY",
+        message: "Meeting Mode hotkey is disabled in EGGHEADS Dictation",
+      };
+    }
     if (hotkey) {
       const result = await hotkeyManager.registerSlot("meeting", hotkey, meetingHotkeyCallback);
       windowManager.reconcileNativeKeyListeners();
@@ -933,102 +869,108 @@ async function startApp() {
   initializeDeferredManagers();
 
   app.on("browser-window-focus", () => {
-    if (googleCalendarManager) googleCalendarManager.syncOnFocus();
+    if (!EGGHEADS_DICTATION_ONLY && googleCalendarManager) googleCalendarManager.syncOnFocus();
   });
 
   const { powerMonitor } = require("electron");
   powerMonitor.on("resume", () => {
-    if (googleCalendarManager) {
+    if (!EGGHEADS_DICTATION_ONLY && googleCalendarManager) {
       googleCalendarManager.onWakeFromSleep();
     }
     // Sleep evicts the local GPU model from VRAM; reload it once the driver settles. See #766.
     if (wakeRewarmTimer) clearTimeout(wakeRewarmTimer);
-    wakeRewarmTimer = setTimeout(() => {
-      wakeRewarmTimer = null;
-      whisperManager?.onWakeFromSleep().catch((err) => {
-        debugLogger.debug("whisper wake re-warm error (non-fatal)", { error: err.message });
-      });
-    }, WHISPER_WAKE_REWARM_DELAY_MS);
+    if (!EGGHEADS_DICTATION_ONLY) {
+      wakeRewarmTimer = setTimeout(() => {
+        wakeRewarmTimer = null;
+        whisperManager?.onWakeFromSleep().catch((err) => {
+          debugLogger.debug("whisper wake re-warm error (non-fatal)", { error: err.message });
+        });
+      }, WHISPER_WAKE_REWARM_DELAY_MS);
+    }
   });
 
   // Non-blocking server pre-warming
-  const whisperSettings = {
-    localTranscriptionProvider: process.env.LOCAL_TRANSCRIPTION_PROVIDER || "",
-    whisperModel: process.env.LOCAL_WHISPER_MODEL,
-    useCuda: process.env.WHISPER_CUDA_ENABLED === "true" && whisperCudaManager?.isDownloaded(),
-  };
-  whisperManager.initializeAtStartup(whisperSettings).catch((err) => {
-    debugLogger.debug("Whisper startup init error (non-fatal)", { error: err.message });
-  });
-
-  const parakeetSettings = {
-    localTranscriptionProvider: process.env.LOCAL_TRANSCRIPTION_PROVIDER || "",
-    parakeetModel: process.env.PARAKEET_MODEL,
-  };
-  parakeetManager.initializeAtStartup(parakeetSettings).catch((err) => {
-    debugLogger.debug("Parakeet startup init error (non-fatal)", { error: err.message });
-  });
-
-  // TODO: drop legacy REASONING_PROVIDER / LOCAL_REASONING_MODEL fallbacks after 2 releases.
-  const cleanupProvider = process.env.CLEANUP_PROVIDER || process.env.REASONING_PROVIDER;
-  const cleanupLocalModel = process.env.LOCAL_CLEANUP_MODEL || process.env.LOCAL_REASONING_MODEL;
-  if (cleanupProvider === "local" && cleanupLocalModel) {
-    const modelManager = require("./src/helpers/modelManagerBridge").default;
-    modelManager.prewarmServer(cleanupLocalModel).catch((err) => {
-      debugLogger.debug("llama-server pre-warm error (non-fatal)", { error: err.message });
+  if (!EGGHEADS_DICTATION_ONLY) {
+    const whisperSettings = {
+      localTranscriptionProvider: process.env.LOCAL_TRANSCRIPTION_PROVIDER || "",
+      whisperModel: process.env.LOCAL_WHISPER_MODEL,
+      useCuda: process.env.WHISPER_CUDA_ENABLED === "true" && whisperCudaManager?.isDownloaded(),
+    };
+    whisperManager.initializeAtStartup(whisperSettings).catch((err) => {
+      debugLogger.debug("Whisper startup init error (non-fatal)", { error: err.message });
     });
-  }
 
-  if (
-    process.env.DICTATION_AGENT_PROVIDER === "local" &&
-    process.env.LOCAL_DICTATION_AGENT_MODEL &&
-    process.env.LOCAL_DICTATION_AGENT_MODEL !== cleanupLocalModel
-  ) {
-    const modelManager = require("./src/helpers/modelManagerBridge").default;
-    modelManager.prewarmServer(process.env.LOCAL_DICTATION_AGENT_MODEL).catch((err) => {
-      debugLogger.debug("dictation-agent llama-server pre-warm error (non-fatal)", {
-        error: err.message,
+    const parakeetSettings = {
+      localTranscriptionProvider: process.env.LOCAL_TRANSCRIPTION_PROVIDER || "",
+      parakeetModel: process.env.PARAKEET_MODEL,
+    };
+    parakeetManager.initializeAtStartup(parakeetSettings).catch((err) => {
+      debugLogger.debug("Parakeet startup init error (non-fatal)", { error: err.message });
+    });
+
+    // TODO: drop legacy REASONING_PROVIDER / LOCAL_REASONING_MODEL fallbacks after 2 releases.
+    const cleanupProvider = process.env.CLEANUP_PROVIDER || process.env.REASONING_PROVIDER;
+    const cleanupLocalModel = process.env.LOCAL_CLEANUP_MODEL || process.env.LOCAL_REASONING_MODEL;
+    if (cleanupProvider === "local" && cleanupLocalModel) {
+      const modelManager = require("./src/helpers/modelManagerBridge").default;
+      modelManager.prewarmServer(cleanupLocalModel).catch((err) => {
+        debugLogger.debug("llama-server pre-warm error (non-fatal)", { error: err.message });
       });
-    });
-  }
+    }
 
-  // Auto-download diarization models if binary is available
-  if (
-    diarizationManager.getBinaryPath() &&
-    (!diarizationManager.isModelDownloaded() || !diarizationManager.isVadModelDownloaded())
-  ) {
-    diarizationManager.downloadModels().catch((err) => {
-      debugLogger.debug("Diarization model auto-download error (non-fatal)", {
-        error: err.message,
+    if (
+      process.env.DICTATION_AGENT_PROVIDER === "local" &&
+      process.env.LOCAL_DICTATION_AGENT_MODEL &&
+      process.env.LOCAL_DICTATION_AGENT_MODEL !== cleanupLocalModel
+    ) {
+      const modelManager = require("./src/helpers/modelManagerBridge").default;
+      modelManager.prewarmServer(process.env.LOCAL_DICTATION_AGENT_MODEL).catch((err) => {
+        debugLogger.debug("dictation-agent llama-server pre-warm error (non-fatal)", {
+          error: err.message,
+        });
       });
-    });
-  }
+    }
 
-  const QdrantManager = require("./src/helpers/qdrantManager");
-  qdrantManager = new QdrantManager();
-  sidecarRegistry.register("qdrant", () => qdrantManager.stop());
-  if (qdrantManager.isAvailable()) {
-    qdrantManager
-      .start()
-      .then(() => {
-        if (qdrantManager.isReady()) {
-          const vectorIndex = require("./src/helpers/vectorIndex");
-          vectorIndex.init(qdrantManager.getPort());
-          vectorIndex.ensureCollection().catch((err) => {
-            debugLogger.debug("Qdrant collection setup error (non-fatal)", { error: err.message });
-          });
-        }
-      })
-      .catch((err) => {
-        debugLogger.debug("Qdrant startup error (non-fatal)", { error: err.message });
+    // Auto-download diarization models if binary is available
+    if (
+      diarizationManager.getBinaryPath() &&
+      (!diarizationManager.isModelDownloaded() || !diarizationManager.isVadModelDownloaded())
+    ) {
+      diarizationManager.downloadModels().catch((err) => {
+        debugLogger.debug("Diarization model auto-download error (non-fatal)", {
+          error: err.message,
+        });
       });
-  }
+    }
 
-  const localEmbeddings = require("./src/helpers/localEmbeddings");
-  if (!localEmbeddings.isAvailable()) {
-    localEmbeddings.downloadModel().catch((err) => {
-      debugLogger.debug("Embedding model download error (non-fatal)", { error: err.message });
-    });
+    const QdrantManager = require("./src/helpers/qdrantManager");
+    qdrantManager = new QdrantManager();
+    sidecarRegistry.register("qdrant", () => qdrantManager.stop());
+    if (qdrantManager.isAvailable()) {
+      qdrantManager
+        .start()
+        .then(() => {
+          if (qdrantManager.isReady()) {
+            const vectorIndex = require("./src/helpers/vectorIndex");
+            vectorIndex.init(qdrantManager.getPort());
+            vectorIndex.ensureCollection().catch((err) => {
+              debugLogger.debug("Qdrant collection setup error (non-fatal)", {
+                error: err.message,
+              });
+            });
+          }
+        })
+        .catch((err) => {
+          debugLogger.debug("Qdrant startup error (non-fatal)", { error: err.message });
+        });
+    }
+
+    const localEmbeddings = require("./src/helpers/localEmbeddings");
+    if (!localEmbeddings.isAvailable()) {
+      localEmbeddings.downloadModel().catch((err) => {
+        debugLogger.debug("Embedding model download error (non-fatal)", { error: err.message });
+      });
+    }
   }
 
   if (process.platform === "win32") {

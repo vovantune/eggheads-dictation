@@ -2,6 +2,7 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { PROMPTS_BY_LOCALE } from "./locales/prompts";
 import { TRANSLATIONS_BY_LOCALE } from "./locales/translations";
+import { EGGHEADS_DICTATION_ONLY } from "./lib/features";
 
 export const SUPPORTED_UI_LANGUAGES = [
   "en",
@@ -85,7 +86,9 @@ const browserLanguage =
 const storageLanguage =
   typeof window !== "undefined" ? window.localStorage.getItem("uiLanguage") : undefined;
 
-const initialLanguage = normalizeUiLanguage(storageLanguage || browserLanguage || "en");
+const initialLanguage = normalizeUiLanguage(
+  storageLanguage || (EGGHEADS_DICTATION_ONLY ? "ru" : browserLanguage) || "en"
+);
 
 void i18n.use(initReactI18next).init({
   resources,

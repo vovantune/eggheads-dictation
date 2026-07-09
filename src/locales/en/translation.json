@@ -197,7 +197,7 @@
       "systemAudioDescription": "Lets the meeting recorder hear the other side of your calls — meetings, lectures, podcasts. You can turn this on later in Settings.",
       "optional": "Optional",
       "recommended": "Recommended",
-      "accessibilityTroubleshooting": "In System Settings → Accessibility, switch OpenWhispr's toggle off and back on. If that doesn't work, remove OpenWhispr from the list and add it back. Still stuck? Email support@openwhispr.com."
+      "accessibilityTroubleshooting": "In System Settings → Accessibility, switch EGGHEADS Dictation's toggle off and back on. If that doesn't work, remove EGGHEADS Dictation from the list and add it back. Still stuck? Email support@eggheads.solutions."
     },
     "transcription": {
       "title": "Transcription Setup",
@@ -547,7 +547,7 @@
         "description": "Part of the recording couldn't be transcribed."
       },
       "errorDescriptions": {
-        "sessionExpired": "Your OpenWhispr Cloud session is unavailable. Please sign in again from Settings.",
+        "sessionExpired": "Your EGGHEADS Dictation session is unavailable. Please sign in to EGGHEADS again from Settings.",
         "offline": "You're offline. Cloud transcription requires an internet connection.",
         "dailyLimitReached": "You've reached today's transcription limit. Try again tomorrow or upgrade your plan.",
         "providerRateLimited": "Your transcription provider rate-limited the request. Wait a moment and try again."

@@ -1,28 +1,37 @@
-import { createAuthClient } from "better-auth/react";
-import { ssoClient } from "@better-auth/sso/client";
-import { OPENWHISPR_API_URL } from "../config/constants";
 import { openExternalLink } from "../utils/externalLinks";
 
-export const AUTH_URL = import.meta.env.VITE_AUTH_URL || "https://auth.openwhispr.com";
-export const authClient = createAuthClient({
-  baseURL: AUTH_URL,
-  plugins: [ssoClient()],
-  fetchOptions: {
-    auth: {
-      type: "Bearer",
-      token: async () => (await window.electronAPI?.authGetToken?.()) ?? "",
-    },
-    headers: { "x-openwhispr-source": "desktop" },
-    onSuccess: async (ctx: { response: Response }) => {
-      const newToken = ctx.response.headers.get("set-auth-token");
-      if (newToken) await window.electronAPI?.authSetToken?.(newToken);
-    },
-  },
+export const AUTH_URL = import.meta.env.VITE_EGGHEADS_AUTH_URL || "https://eggheads.solutions";
+
+type AuthResult = { error?: { message?: string } };
+type AuthEmailPayload = { email: string; password: string; name?: string };
+type AuthSsoPayload = { email: string };
+type AuthSocialPayload = { provider: SocialProvider };
+type VerificationPayload = { email: string };
+
+const authDisabled = async (_message: string): Promise<AuthResult> => ({
+  error: { message: "This auth flow is disabled in EGGHEADS Dictation" },
 });
 
-export type SocialProvider = "google" | "microsoft" | "apple";
+export const authClient = {
+  useSession: undefined,
+  signOut: async (): Promise<AuthResult> => ({}),
+  signIn: {
+    social: async (_payload: AuthSocialPayload): Promise<AuthResult> => authDisabled("social"),
+    sso: async (_payload: AuthSsoPayload): Promise<AuthResult> => authDisabled("sso"),
+    email: async (_payload: AuthEmailPayload): Promise<AuthResult> => authDisabled("email"),
+  },
+  signUp: {
+    email: async (_payload: AuthEmailPayload): Promise<AuthResult> => authDisabled("signup"),
+  },
+  sendVerificationEmail: async (_payload: VerificationPayload): Promise<AuthResult> =>
+    authDisabled("verification"),
+  requestPasswordReset: async (_payload: VerificationPayload): Promise<AuthResult> =>
+    authDisabled("password-reset"),
+};
 
-const LAST_SIGN_IN_STORAGE_KEY = "openwhispr:lastSignInTime";
+export type SocialProvider = "eggheads" | "google" | "microsoft" | "apple";
+
+const LAST_SIGN_IN_STORAGE_KEY = "eggheads:lastSignInTime";
 const GRACE_PERIOD_MS = 60_000;
 const GRACE_RETRY_COUNT = 6;
 const INITIAL_GRACE_RETRY_DELAY_MS = 500;
@@ -38,26 +47,9 @@ function getLocalStorageSafe(): Storage | null {
   }
 }
 
-function loadLastSignInTimeFromStorage(): number | null {
-  const storage = getLocalStorageSafe();
-  if (!storage) return null;
-
-  const raw = storage.getItem(LAST_SIGN_IN_STORAGE_KEY);
-  if (!raw) return null;
-
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    storage.removeItem(LAST_SIGN_IN_STORAGE_KEY);
-    return null;
-  }
-
-  return parsed;
-}
-
 function persistLastSignInTime(value: number | null): void {
   const storage = getLocalStorageSafe();
   if (!storage) return;
-
   if (value === null) {
     storage.removeItem(LAST_SIGN_IN_STORAGE_KEY);
   } else {
@@ -65,11 +57,22 @@ function persistLastSignInTime(value: number | null): void {
   }
 }
 
+function loadLastSignInTimeFromStorage(): number | null {
+  const storage = getLocalStorageSafe();
+  if (!storage) return null;
+  const raw = storage.getItem(LAST_SIGN_IN_STORAGE_KEY);
+  if (!raw) return null;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    storage.removeItem(LAST_SIGN_IN_STORAGE_KEY);
+    return null;
+  }
+  return parsed;
+}
+
 function getLastSignInTime(): number | null {
   const stored = loadLastSignInTimeFromStorage();
-  if (stored !== null) {
-    lastSignInTime = stored;
-  }
+  if (stored !== null) lastSignInTime = stored;
   return lastSignInTime;
 }
 
@@ -102,41 +105,17 @@ export function updateLastSignInTime(): void {
 export function isWithinGracePeriod(): boolean {
   const startedAt = getLastSignInTime();
   if (!startedAt) return false;
-
-  const elapsed = Math.max(0, Date.now() - startedAt);
-  return elapsed < GRACE_PERIOD_MS;
+  return Math.max(0, Date.now() - startedAt) < GRACE_PERIOD_MS;
 }
 
 export async function deleteAccount(): Promise<{ error?: Error }> {
-  if (!OPENWHISPR_API_URL) {
-    return { error: new Error("API not configured") };
-  }
-
-  try {
-    const res = await fetch(`${OPENWHISPR_API_URL}/api/auth/delete-account`, {
-      method: "DELETE",
-      credentials: "include",
-    });
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || "Failed to delete account");
-    }
-
-    return {};
-  } catch (error) {
-    return { error: error instanceof Error ? error : new Error("Failed to delete account") };
-  }
+  return { error: new Error("Account management is handled in EGGHEADS") };
 }
 
 export async function signOut(): Promise<void> {
   try {
-    await authClient.signOut();
-    if (window.electronAPI?.authClearSession) {
-      await window.electronAPI.authClearSession();
-    }
-    markSignedOutState();
-  } catch {
+    await window.electronAPI?.authClearSession?.();
+  } finally {
     markSignedOutState();
   }
 }
@@ -151,12 +130,12 @@ export async function withSessionRefresh<T>(operation: () => Promise<T>): Promis
     } catch (error: any) {
       const isAuthExpired =
         error?.code === "AUTH_EXPIRED" ||
+        error?.code === "AUTH_REQUIRED" ||
         error?.message?.toLowerCase().includes("session expired") ||
+        error?.message?.toLowerCase().includes("not authenticated") ||
         error?.message?.toLowerCase().includes("auth expired");
 
-      if (!isAuthExpired) {
-        throw error;
-      }
+      if (!isAuthExpired) throw error;
 
       if (startedInGracePeriod && graceRetriesUsed < GRACE_RETRY_COUNT) {
         const delayMs = INITIAL_GRACE_RETRY_DELAY_MS * Math.pow(2, graceRetriesUsed);
@@ -170,64 +149,24 @@ export async function withSessionRefresh<T>(operation: () => Promise<T>): Promis
   }
 }
 
-const DESKTOP_OAUTH_CALLBACK_URL = "https://openwhispr.com/auth/desktop-callback";
-
-export async function signInWithSocial(provider: SocialProvider): Promise<{ error?: Error }> {
+export async function signInWithSocial(_provider?: SocialProvider): Promise<{ error?: Error }> {
   try {
-    const isElectron = Boolean((window as any).electronAPI);
-
-    if (isElectron) {
-      // OAuth must be initiated from the user's browser, not the renderer:
-      // the state cookie Better Auth sets has to land in the same cookie jar
-      // that handles the /api/auth/callback/* round-trip. The shim endpoint
-      // does the POST server-side and 302s with the cookies attached.
-      const protocol = (await window.electronAPI?.getOAuthProtocol?.()) || "openwhispr";
-      const url = new URL(`${AUTH_URL}/api/desktop-signin/${provider}`);
-      url.searchParams.set("callbackURL", `${DESKTOP_OAUTH_CALLBACK_URL}?protocol=${protocol}`);
-      openExternalLink(url.toString());
-      return {};
+    const result = await window.electronAPI?.authStart?.();
+    if (result?.success === false) {
+      return { error: new Error(result.error || "Failed to start EGGHEADS sign-in") };
     }
-
-    const callbackURL = `${window.location.href.split("?")[0].split("#")[0]}?panel=true`;
-    await authClient.signIn.social({ provider, callbackURL, newUserCallbackURL: callbackURL });
+    updateLastSignInTime();
     return {};
   } catch (error) {
-    return { error: error instanceof Error ? error : new Error("Social sign-in failed") };
+    return { error: error instanceof Error ? error : new Error("EGGHEADS sign-in failed") };
   }
 }
 
-export async function signInWithSSO(email: string): Promise<{ error?: Error }> {
-  try {
-    const isElectron = Boolean((window as any).electronAPI);
-
-    if (isElectron) {
-      // Same browser-handoff rationale as signInWithSocial: the SSO state cookie
-      // must land in the browser's cookie jar. The /sso shim routes by work-email
-      // domain and 302s to the workspace's IdP with the cookies attached.
-      const protocol = (await window.electronAPI?.getOAuthProtocol?.()) || "openwhispr";
-      const url = new URL(`${AUTH_URL}/api/desktop-signin/sso`);
-      url.searchParams.set("email", email);
-      url.searchParams.set("callbackURL", `${DESKTOP_OAUTH_CALLBACK_URL}?protocol=${protocol}`);
-      openExternalLink(url.toString());
-      return {};
-    }
-
-    const callbackURL = `${window.location.href.split("?")[0].split("#")[0]}?panel=true`;
-    await authClient.signIn.sso({ email, callbackURL });
-    return {};
-  } catch (error) {
-    return { error: error instanceof Error ? error : new Error("Single sign-on failed") };
-  }
+export async function signInWithSSO(_email: string): Promise<{ error?: Error }> {
+  return signInWithSocial("eggheads");
 }
 
-export async function requestPasswordReset(email: string): Promise<{ error?: Error }> {
-  try {
-    await authClient.requestPasswordReset({
-      email: email.trim(),
-      redirectTo: "https://openwhispr.com/reset-password",
-    });
-    return {};
-  } catch (error) {
-    return { error: error instanceof Error ? error : new Error("Failed to send reset email") };
-  }
+export async function requestPasswordReset(_email: string): Promise<{ error?: Error }> {
+  openExternalLink(`${AUTH_URL}/authorization/goToService`);
+  return {};
 }

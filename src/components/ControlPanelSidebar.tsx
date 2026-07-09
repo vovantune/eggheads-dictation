@@ -23,7 +23,7 @@ import WorkspaceSwitcher from "./WorkspaceSwitcher";
 import InviteTeammateDialog from "./InviteTeammateDialog";
 import CreateWorkspaceDialog from "./CreateWorkspaceDialog";
 import { useWorkspace } from "../hooks/useWorkspace";
-import { WORKSPACES_ENABLED } from "../lib/features";
+import { EGGHEADS_DICTATION_ONLY, WORKSPACES_ENABLED } from "../lib/features";
 
 const platform = getCachedPlatform();
 
@@ -85,14 +85,16 @@ export default function ControlPanelSidebar({
     id: ControlPanelView;
     label: string;
     icon: React.ComponentType<{ size?: number; className?: string }>;
-  }[] = [
-    { id: "home", label: t("sidebar.home"), icon: Home },
-    { id: "chat", label: t("sidebar.chat"), icon: MessageSquare },
-    { id: "personal-notes", label: t("sidebar.notes"), icon: NotebookPen },
-    { id: "upload", label: t("sidebar.upload"), icon: Upload },
-    { id: "dictionary", label: t("sidebar.dictionary"), icon: BookOpen },
-    { id: "integrations", label: t("sidebar.integrations"), icon: Blocks },
-  ];
+  }[] = EGGHEADS_DICTATION_ONLY
+    ? [{ id: "home", label: t("sidebar.home"), icon: Home }]
+    : [
+        { id: "home", label: t("sidebar.home"), icon: Home },
+        { id: "chat", label: t("sidebar.chat"), icon: MessageSquare },
+        { id: "personal-notes", label: t("sidebar.notes"), icon: NotebookPen },
+        { id: "upload", label: t("sidebar.upload"), icon: Upload },
+        { id: "dictionary", label: t("sidebar.dictionary"), icon: BookOpen },
+        { id: "integrations", label: t("sidebar.integrations"), icon: Blocks },
+      ];
 
   return (
     <div className="w-48 h-full shrink-0 border-r border-border/15 dark:border-white/6 flex flex-col bg-surface-1/60 dark:bg-surface-1">
@@ -101,13 +103,13 @@ export default function ControlPanelSidebar({
         style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
       />
 
-      {WORKSPACES_ENABLED && isSignedIn && (
+      {!EGGHEADS_DICTATION_ONLY && WORKSPACES_ENABLED && isSignedIn && (
         <div className="px-2 pt-1 pb-1">
           <WorkspaceSwitcher userName={userName} />
         </div>
       )}
 
-      {onOpenSearch && (
+      {!EGGHEADS_DICTATION_ONLY && onOpenSearch && (
         <div className="px-2 pt-2 pb-1">
           <button
             onClick={onOpenSearch}
@@ -172,7 +174,7 @@ export default function ControlPanelSidebar({
 
       <div className="flex-1" />
 
-      {showLimitBanner && (
+      {!EGGHEADS_DICTATION_ONLY && showLimitBanner && (
         <div className="px-2 pb-2">
           <div className="rounded-lg border border-destructive/25 bg-destructive/5 dark:bg-destructive/10 p-3">
             <div className="flex flex-col items-center text-center">
@@ -194,7 +196,7 @@ export default function ControlPanelSidebar({
         </div>
       )}
 
-      {showUpgradeBanner && (
+      {!EGGHEADS_DICTATION_ONLY && showUpgradeBanner && (
         <div className="px-2 pb-2">
           <div className="relative rounded-lg border border-primary/20 bg-primary/5 dark:bg-primary/10 p-3">
             <button
@@ -233,7 +235,7 @@ export default function ControlPanelSidebar({
           </div>
         )}
 
-        {isSignedIn && onOpenReferrals && (
+        {!EGGHEADS_DICTATION_ONLY && isSignedIn && onOpenReferrals && (
           <button
             onClick={onOpenReferrals}
             aria-label={t("sidebar.referral")}
@@ -249,7 +251,7 @@ export default function ControlPanelSidebar({
           </button>
         )}
 
-        {WORKSPACES_ENABLED && isSignedIn && (
+        {!EGGHEADS_DICTATION_ONLY && WORKSPACES_ENABLED && isSignedIn && (
           <button
             onClick={() => (activeWorkspace ? setInviteOpen(true) : setCreateWorkspaceOpen(true))}
             aria-label={

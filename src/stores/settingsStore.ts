@@ -26,10 +26,19 @@ import type {
   ChatAgentSettings,
 } from "../hooks/useSettings";
 import type { Snippet } from "../utils/snippets";
+import { EGGHEADS_DICTATION_ONLY } from "../lib/features";
 
 let _ReasoningService: typeof import("../services/ReasoningService").default | null = null;
 
 const isBrowser = typeof window !== "undefined";
+const DEFAULT_UI_LANGUAGE = EGGHEADS_DICTATION_ONLY ? "ru" : "en";
+const DEFAULT_TRANSCRIPTION_LANGUAGE = EGGHEADS_DICTATION_ONLY ? "ru" : "auto";
+const DEFAULT_ACTIVATION_MODE: "tap" | "push" = EGGHEADS_DICTATION_ONLY ? "push" : "tap";
+
+function readUiLanguage(): string {
+  const stored = isBrowser ? localStorage.getItem("uiLanguage") : null;
+  return normalizeUiLanguage(stored || DEFAULT_UI_LANGUAGE);
+}
 
 function readString(key: string, fallback: string): string {
   if (!isBrowser) return fallback;
@@ -833,8 +842,8 @@ function invalidateApiKeyCaches(
 }
 
 export const useSettingsStore = create<SettingsState>()((set, get) => ({
-  uiLanguage: normalizeUiLanguage(isBrowser ? localStorage.getItem("uiLanguage") : null),
-  useLocalWhisper: readBoolean("useLocalWhisper", false),
+  uiLanguage: readUiLanguage(),
+  useLocalWhisper: EGGHEADS_DICTATION_ONLY ? false : readBoolean("useLocalWhisper", false),
   whisperModel: readString("whisperModel", "base"),
   localTranscriptionProvider: (readString("localTranscriptionProvider", "whisper") === "nvidia"
     ? "nvidia"
@@ -843,21 +852,27 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   allowOpenAIFallback: readBoolean("allowOpenAIFallback", false),
   allowLocalFallback: readBoolean("allowLocalFallback", false),
   fallbackWhisperModel: readString("fallbackWhisperModel", "base"),
-  preferredLanguage: readString("preferredLanguage", "auto"),
-  cloudTranscriptionProvider: readString("cloudTranscriptionProvider", "openai"),
-  cloudTranscriptionModel: readString("cloudTranscriptionModel", "gpt-4o-mini-transcribe"),
+  preferredLanguage: readString("preferredLanguage", DEFAULT_TRANSCRIPTION_LANGUAGE),
+  cloudTranscriptionProvider: EGGHEADS_DICTATION_ONLY
+    ? "eggheads"
+    : readString("cloudTranscriptionProvider", "openai"),
+  cloudTranscriptionModel: EGGHEADS_DICTATION_ONLY
+    ? "whisper-1"
+    : readString("cloudTranscriptionModel", "gpt-4o-mini-transcribe"),
   cloudTranscriptionBaseUrl: readString(
     "cloudTranscriptionBaseUrl",
     API_ENDPOINTS.TRANSCRIPTION_BASE
   ),
   // Secrets aren't hydrated yet at construction; the BYOK default is set
   // post-hydration in initializeSettings.
-  cloudTranscriptionMode: readString("cloudTranscriptionMode", "openwhispr"),
-  cleanupCloudMode: readString("cleanupCloudMode", "openwhispr"),
+  cloudTranscriptionMode: "openwhispr",
+  cleanupCloudMode: EGGHEADS_DICTATION_ONLY
+    ? "disabled"
+    : readString("cleanupCloudMode", "openwhispr"),
   cleanupCloudBaseUrl: readString("cleanupCloudBaseUrl", API_ENDPOINTS.OPENAI_BASE),
   cortiEnvironment: readString("cortiEnvironment", "us"),
   cortiTenant: readString("cortiTenant", "base"),
-  customDictionary: readStringArray("customDictionary", []),
+  customDictionary: EGGHEADS_DICTATION_ONLY ? [] : readStringArray("customDictionary", []),
   snippets: (() => {
     try {
       const parsed = JSON.parse(readString("snippets", "[]"));
@@ -869,10 +884,10 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   assemblyAiStreaming: readBoolean("assemblyAiStreaming", true),
 
   autoGenerateNoteTitle: readBoolean("autoGenerateNoteTitle", true),
-  useCleanupModel: readBoolean("useCleanupModel", true),
-  useDictationAgent: readBoolean("useDictationAgent", true),
-  cleanupModel: readString("cleanupModel", ""),
-  cleanupProvider: readString("cleanupProvider", "openai"),
+  useCleanupModel: EGGHEADS_DICTATION_ONLY ? false : readBoolean("useCleanupModel", true),
+  useDictationAgent: EGGHEADS_DICTATION_ONLY ? false : readBoolean("useDictationAgent", true),
+  cleanupModel: EGGHEADS_DICTATION_ONLY ? "" : readString("cleanupModel", ""),
+  cleanupProvider: EGGHEADS_DICTATION_ONLY ? "openai" : readString("cleanupProvider", "openai"),
 
   // Secrets hydrate from main process in initializeSettings, never from localStorage.
   openaiApiKey: "",
@@ -911,10 +926,11 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   meetingHotkeyLayoutMode: (readString("meetingHotkeyLayoutMode", "full-width") === "side-panel"
     ? "side-panel"
     : "full-width") as "side-panel" | "full-width",
-  activationMode: (readString("activationMode", "tap") === "push" ? "push" : "tap") as
-    "tap" | "push",
+  activationMode: (readString("activationMode", DEFAULT_ACTIVATION_MODE) === "push"
+    ? "push"
+    : "tap") as "tap" | "push",
 
-  preferBuiltInMic: readBoolean("preferBuiltInMic", true),
+  preferBuiltInMic: EGGHEADS_DICTATION_ONLY ? false : readBoolean("preferBuiltInMic", true),
   selectedMicDeviceId: readString("selectedMicDeviceId", ""),
 
   theme: (() => {
@@ -938,8 +954,12 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   floatingIconAutoHide: readBoolean("floatingIconAutoHide", false),
   startMinimized: readBoolean("startMinimized", false),
   notificationsEnabled: readBoolean("notificationsEnabled", true),
-  notifyMeetingDetection: readBoolean("notifyMeetingDetection", true),
-  notifyCalendarReminders: readBoolean("notifyCalendarReminders", true),
+  notifyMeetingDetection: EGGHEADS_DICTATION_ONLY
+    ? false
+    : readBoolean("notifyMeetingDetection", true),
+  notifyCalendarReminders: EGGHEADS_DICTATION_ONLY
+    ? false
+    : readBoolean("notifyCalendarReminders", true),
   notifyUpdates: readBoolean("notifyUpdates", true),
   ...(() => {
     let accounts: GoogleCalendarAccount[] = [];
@@ -955,12 +975,16 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       gcalEmail: accounts[0]?.email ?? "",
     };
   })(),
-  gcalPrimaryOnly: readBoolean("gcalPrimaryOnly", true),
-  meetingProcessDetection: readBoolean("meetingProcessDetection", true),
-  speakerDiarizationEnabled: readBoolean("speakerDiarizationEnabled", true),
+  gcalPrimaryOnly: EGGHEADS_DICTATION_ONLY ? false : readBoolean("gcalPrimaryOnly", true),
+  meetingProcessDetection: EGGHEADS_DICTATION_ONLY
+    ? false
+    : readBoolean("meetingProcessDetection", true),
+  speakerDiarizationEnabled: EGGHEADS_DICTATION_ONLY
+    ? false
+    : readBoolean("speakerDiarizationEnabled", true),
   dictationSileroEnabled: readBoolean("dictationSileroEnabled", true),
   noteRecordingSileroEnabled: readBoolean("noteRecordingSileroEnabled", true),
-  meetingSileroEnabled: readBoolean("meetingSileroEnabled", true),
+  meetingSileroEnabled: EGGHEADS_DICTATION_ONLY ? false : readBoolean("meetingSileroEnabled", true),
   whisperVadThreshold: clampVadValue("threshold", readString("whisperVadThreshold", "0.5")),
   whisperVadMinSpeechDurationMs: clampVadValue(
     "minSpeechDurationMs",
@@ -1074,7 +1098,12 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   noteFormattingRemoteUrl: readString("noteFormattingRemoteUrl", ""),
   noteFormattingCustomApiKey: readString("noteFormattingCustomApiKey", ""),
 
-  setTranscriptionMode: createStringSetter("transcriptionMode") as (mode: InferenceMode) => void,
+  setTranscriptionMode: EGGHEADS_DICTATION_ONLY
+    ? (() => {
+        if (isBrowser) localStorage.setItem("transcriptionMode", "openwhispr");
+        set({ transcriptionMode: "openwhispr" as InferenceMode });
+      })
+    : (createStringSetter("transcriptionMode") as (mode: InferenceMode) => void),
   setRemoteTranscriptionType: createStringSetter("remoteTranscriptionType") as (
     type: SelfHostedType
   ) => void,
@@ -1157,8 +1186,10 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       return v;
     return "openwhispr" as InferenceMode;
   })(),
-  dictationAgentProvider: readString("dictationAgentProvider", ""),
-  dictationAgentModel: readString("dictationAgentModel", ""),
+  dictationAgentProvider: EGGHEADS_DICTATION_ONLY
+    ? "openai"
+    : readString("dictationAgentProvider", ""),
+  dictationAgentModel: EGGHEADS_DICTATION_ONLY ? "" : readString("dictationAgentModel", ""),
   dictationAgentCloudMode: readString("dictationAgentCloudMode", "openwhispr"),
   dictationAgentCloudBaseUrl: readString("dictationAgentCloudBaseUrl", ""),
   dictationAgentRemoteUrl: readString("dictationAgentRemoteUrl", ""),
@@ -1193,7 +1224,12 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   setNoteFormattingDisableThinking: createBooleanSetter("noteFormattingDisableThinking"),
   setChatAgentDisableThinking: createBooleanSetter("chatAgentDisableThinking"),
 
-  setUseLocalWhisper: createBooleanSetter("useLocalWhisper"),
+  setUseLocalWhisper: EGGHEADS_DICTATION_ONLY
+    ? () => {
+        if (isBrowser) localStorage.setItem("useLocalWhisper", "false");
+        set({ useLocalWhisper: false });
+      }
+    : createBooleanSetter("useLocalWhisper"),
   setWhisperModel: createStringSetter("whisperModel"),
   setLocalTranscriptionProvider: (value: LocalTranscriptionProvider) => {
     if (isBrowser) localStorage.setItem("localTranscriptionProvider", value);
@@ -1204,10 +1240,25 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   setAllowLocalFallback: createBooleanSetter("allowLocalFallback"),
   setFallbackWhisperModel: createStringSetter("fallbackWhisperModel"),
   setPreferredLanguage: createStringSetter("preferredLanguage"),
-  setCloudTranscriptionProvider: createStringSetter("cloudTranscriptionProvider"),
-  setCloudTranscriptionModel: createStringSetter("cloudTranscriptionModel"),
+  setCloudTranscriptionProvider: EGGHEADS_DICTATION_ONLY
+    ? () => {
+        if (isBrowser) localStorage.setItem("cloudTranscriptionProvider", "eggheads");
+        set({ cloudTranscriptionProvider: "eggheads" });
+      }
+    : createStringSetter("cloudTranscriptionProvider"),
+  setCloudTranscriptionModel: EGGHEADS_DICTATION_ONLY
+    ? () => {
+        if (isBrowser) localStorage.setItem("cloudTranscriptionModel", "whisper-1");
+        set({ cloudTranscriptionModel: "whisper-1" });
+      }
+    : createStringSetter("cloudTranscriptionModel"),
   setCloudTranscriptionBaseUrl: createStringSetter("cloudTranscriptionBaseUrl"),
-  setCloudTranscriptionMode: createStringSetter("cloudTranscriptionMode"),
+  setCloudTranscriptionMode: EGGHEADS_DICTATION_ONLY
+    ? () => {
+        if (isBrowser) localStorage.setItem("cloudTranscriptionMode", "openwhispr");
+        set({ cloudTranscriptionMode: "openwhispr" });
+      }
+    : createStringSetter("cloudTranscriptionMode"),
   setCleanupCloudMode: createStringSetter("cleanupCloudMode"),
   setCleanupCloudBaseUrl: createStringSetter("cleanupCloudBaseUrl"),
   setAssemblyAiStreaming: createBooleanSetter("assemblyAiStreaming"),
@@ -1218,6 +1269,11 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   setCleanupModel: createStringSetter("cleanupModel"),
 
   setCustomDictionary: (words: string[]) => {
+    if (EGGHEADS_DICTATION_ONLY) {
+      if (isBrowser) localStorage.setItem("customDictionary", "[]");
+      set({ customDictionary: [] });
+      return;
+    }
     if (isBrowser) localStorage.setItem("customDictionary", JSON.stringify(words));
     set({ customDictionary: words });
     window.electronAPI
@@ -1245,6 +1301,8 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   setSnippets: (snippets: Snippet[]) => {
     if (isBrowser) localStorage.setItem("snippets", JSON.stringify(snippets));
     set({ snippets });
+    if (EGGHEADS_DICTATION_ONLY) return;
+
     window.electronAPI
       ?.setSnippets?.(snippets)
       .then(() => {
@@ -2087,6 +2145,10 @@ export async function initializeSettings(): Promise<void> {
 
     try {
       let envMode = await window.electronAPI.getActivationMode?.();
+      const hasStoredActivationMode = isBrowser && localStorage.getItem("activationMode") !== null;
+      if (EGGHEADS_DICTATION_ONLY && !hasStoredActivationMode && envMode === "tap") {
+        envMode = DEFAULT_ACTIVATION_MODE;
+      }
       if (envMode && envMode !== state.activationMode) {
         if (isBrowser) localStorage.setItem("activationMode", envMode);
         useSettingsStore.setState({ activationMode: envMode });
@@ -2165,19 +2227,21 @@ export async function initializeSettings(): Promise<void> {
       );
     }
 
-    // Audio detection is derived from the meeting-notification toggle in
-    // sync-notification-preferences, so only process detection is sent here.
-    try {
-      const currentState = useSettingsStore.getState();
-      await window.electronAPI.meetingDetectionSetPreferences?.({
-        processDetection: currentState.meetingProcessDetection,
-      });
-    } catch (err) {
-      logger.warn(
-        "Failed to sync meeting detection preferences on startup",
-        { error: (err as Error).message },
-        "settings"
-      );
+    if (!EGGHEADS_DICTATION_ONLY) {
+      // Audio detection is derived from the meeting-notification toggle in
+      // sync-notification-preferences, so only process detection is sent here.
+      try {
+        const currentState = useSettingsStore.getState();
+        await window.electronAPI.meetingDetectionSetPreferences?.({
+          processDetection: currentState.meetingProcessDetection,
+        });
+      } catch (err) {
+        logger.warn(
+          "Failed to sync meeting detection preferences on startup",
+          { error: (err as Error).message },
+          "settings"
+        );
+      }
     }
 
     try {
@@ -2196,28 +2260,30 @@ export async function initializeSettings(): Promise<void> {
       );
     }
 
-    try {
-      const currentState = useSettingsStore.getState();
-      await window.electronAPI.gcalSetPrimaryOnly?.(currentState.gcalPrimaryOnly);
-    } catch (err) {
-      logger.warn(
-        "Failed to sync gcal primary-only on startup",
-        { error: (err as Error).message },
-        "settings"
-      );
-    }
+    if (!EGGHEADS_DICTATION_ONLY) {
+      try {
+        const currentState = useSettingsStore.getState();
+        await window.electronAPI.gcalSetPrimaryOnly?.(currentState.gcalPrimaryOnly);
+      } catch (err) {
+        logger.warn(
+          "Failed to sync gcal primary-only on startup",
+          { error: (err as Error).message },
+          "settings"
+        );
+      }
 
-    try {
-      const currentState = useSettingsStore.getState();
-      await window.electronAPI.setSpeakerDiarizationEnabled?.(
-        currentState.speakerDiarizationEnabled
-      );
-    } catch (err) {
-      logger.warn(
-        "Failed to sync speaker diarization preference on startup",
-        { error: (err as Error).message },
-        "settings"
-      );
+      try {
+        const currentState = useSettingsStore.getState();
+        await window.electronAPI.setSpeakerDiarizationEnabled?.(
+          currentState.speakerDiarizationEnabled
+        );
+      } catch (err) {
+        logger.warn(
+          "Failed to sync speaker diarization preference on startup",
+          { error: (err as Error).message },
+          "settings"
+        );
+      }
     }
 
     try {
@@ -2241,7 +2307,9 @@ export async function initializeSettings(): Promise<void> {
       );
     }
 
-    ensureAgentNameInDictionary();
+    if (!EGGHEADS_DICTATION_ONLY) {
+      ensureAgentNameInDictionary();
+    }
   }
 
   // Sync Zustand store when another window writes to localStorage

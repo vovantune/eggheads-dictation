@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "./useAuth";
 import { CACHE_CONFIG } from "../config/constants";
+import { EGGHEADS_DICTATION_ONLY } from "../lib/features";
 import { withSessionRefresh } from "../lib/auth";
 
 interface UsageData {
@@ -73,6 +74,26 @@ export function useUsage(): UseUsageResult | null {
   const lastFetchRef = useRef<number>(0);
 
   const fetchUsage = useCallback(async () => {
+    if (EGGHEADS_DICTATION_ONLY) {
+      setData({
+        wordsUsed: 0,
+        wordsRemaining: -1,
+        limit: -1,
+        plan: "eggheads",
+        status: "active",
+        isSubscribed: true,
+        isTrial: false,
+        trialDaysLeft: null,
+        currentPeriodEnd: null,
+        billingInterval: null,
+        resetAt: "none",
+      });
+      setIsLoading(false);
+      setHasLoaded(true);
+      setError(null);
+      return;
+    }
+
     if (!window.electronAPI?.cloudUsage) return;
 
     setIsLoading(true);
@@ -114,6 +135,11 @@ export function useUsage(): UseUsageResult | null {
   const pendingRefetchRef = useRef(false);
 
   useEffect(() => {
+    if (EGGHEADS_DICTATION_ONLY) {
+      void fetchUsage();
+      return;
+    }
+
     if (!isLoaded || !isSignedIn) {
       lastFetchRef.current = 0;
       setData(null);
@@ -166,6 +192,9 @@ export function useUsage(): UseUsageResult | null {
       plan?: "monthly" | "annual";
       tier?: "pro" | "business";
     }): Promise<{ success: boolean; error?: string }> => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return { success: false, error: "Billing is disabled in EGGHEADS Dictation" };
+      }
       if (checkoutInFlightRef.current)
         return { success: false, error: "Checkout already in progress" };
       if (!window.electronAPI?.cloudCheckout || !window.electronAPI?.openExternal) {
@@ -190,6 +219,9 @@ export function useUsage(): UseUsageResult | null {
   );
 
   const openBillingPortal = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    if (EGGHEADS_DICTATION_ONLY) {
+      return { success: false, error: "Billing is disabled in EGGHEADS Dictation" };
+    }
     if (checkoutInFlightRef.current) return { success: false, error: "Already loading" };
     if (!window.electronAPI?.cloudBillingPortal || !window.electronAPI?.openExternal) {
       return { success: false, error: "App not ready" };
@@ -215,6 +247,9 @@ export function useUsage(): UseUsageResult | null {
       plan: "monthly" | "annual";
       tier: "pro" | "business";
     }): Promise<{ success: boolean; alreadyOnPlan?: boolean; error?: string }> => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return { success: false, error: "Billing is disabled in EGGHEADS Dictation" };
+      }
       if (checkoutInFlightRef.current) return { success: false, error: "Already loading" };
       if (!window.electronAPI?.cloudSwitchPlan) {
         return { success: false, error: "App not ready" };
@@ -237,6 +272,9 @@ export function useUsage(): UseUsageResult | null {
 
   const previewSwitchPlan = useCallback(
     async (opts: { plan: "monthly" | "annual"; tier: "pro" | "business" }) => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return { success: false as const, error: "Billing is disabled in EGGHEADS Dictation" };
+      }
       if (!window.electronAPI?.cloudPreviewSwitch) {
         return { success: false as const, error: "App not ready" };
       }

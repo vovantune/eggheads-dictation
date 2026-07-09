@@ -22,6 +22,8 @@ const jaPrompts = require("../locales/ja/prompts.json");
 const zhCNPrompts = require("../locales/zh-CN/prompts.json");
 const zhTWPrompts = require("../locales/zh-TW/prompts.json");
 
+const EGGHEADS_DICTATION_ONLY = true;
+
 const SUPPORTED_UI_LANGUAGES = ["en", "es", "fr", "de", "pt", "it", "ru", "ja", "zh-CN", "zh-TW"];
 
 function normalizeUiLanguage(language) {
@@ -85,7 +87,7 @@ void i18nMain.init({
       prompts: zhTWPrompts,
     },
   },
-  lng: normalizeUiLanguage(process.env.UI_LANGUAGE),
+  lng: normalizeUiLanguage(process.env.UI_LANGUAGE || (EGGHEADS_DICTATION_ONLY ? "ru" : "en")),
   fallbackLng: "en",
   ns: ["translation", "prompts"],
   defaultNS: "translation",

@@ -1,0 +1,10 @@
+<svg width="224" height="24" viewBox="0 0 224 24" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="eggheads-logo-title">
+<title id="eggheads-logo-title">EGGHEADS. ЦИФРОВЫЕ СОТРУДНИКИ</title>
+<g transform="scale(0.046875)">
+<path fill="#000000" d="M255.3,217c-19.1,0-34.7,15.5-34.7,34.7h69.4C289.9,232.5,274.4,217,255.3,217z"/>
+<path fill="#000000" d="M256,0C114.7,0,0,114.7,0,256c0,141.3,114.7,256,256,256c141.3,0,256-114.5,256-256S397.3,0,256,0z M345.8,316.3v83.2c-26.4,16.9-57.7,26.8-91.3,26.8c-94.1,0-170.3-76.2-170.3-170.3c0-94.1,76.2-170.3,170.3-170.3 c18,0,35.4,2.9,51.8,8.1l84.5,222.5H345.8z"/>
+</g>
+<text x="32" y="17.2" fill="#000000" font-family="Helvetica Neue, Arial, sans-serif" font-size="16" font-weight="900" letter-spacing="0" textLength="82" lengthAdjust="spacingAndGlyphs">EGGHEADS</text>
+<circle cx="119" cy="18" r="1.7" fill="#1F73ED"/>
+<text x="130" y="17" fill="#666666" font-family="Menlo, JetBrains Mono, monospace" font-size="8.5" font-weight="500" letter-spacing="0.5" textLength="90" lengthAdjust="spacingAndGlyphs">ЦИФРОВЫЕ СОТРУДНИКИ</text>
+</svg>

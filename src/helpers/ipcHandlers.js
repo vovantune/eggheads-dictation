@@ -5,6 +5,7 @@ const os = require("os");
 const crypto = require("crypto");
 const debugLogger = require("./debugLogger");
 const tokenStore = require("./tokenStore");
+const eggheadsAuth = require("./eggheadsAuth");
 const { classifyAndLog } = require("./networkErrors");
 const GnomeShortcutManager = require("./gnomeShortcut");
 const HyprlandShortcutManager = require("./hyprlandShortcut");
@@ -122,6 +123,25 @@ const AUDIO_MIME_TYPES = {
   aac: "audio/aac",
 };
 
+const EGGHEADS_DICTATION_ONLY = true;
+const DICTATION_ONLY_DISABLED_CODE = "EGGHEADS_DICTATION_ONLY";
+
+function dictationOnlyDisabled(feature) {
+  return {
+    success: false,
+    code: DICTATION_ONLY_DISABLED_CODE,
+    error: `${feature} is disabled in EGGHEADS Dictation`,
+  };
+}
+
+function dictationOnlyUnavailable(feature) {
+  return {
+    available: false,
+    code: DICTATION_ONLY_DISABLED_CODE,
+    error: `${feature} is disabled in EGGHEADS Dictation`,
+  };
+}
+
 const CLOUD_INLINE_LIMIT = 4 * 1024 * 1024;
 const CLOUD_CHUNK_CONCURRENCY = 5;
 const CLOUD_CHUNK_SEGMENT_SECONDS = 240;
@@ -178,7 +198,7 @@ async function postMultipart(url, body, boundary, headers = {}) {
 }
 
 function interpretTranscribeResponse(data) {
-  if (data.statusCode === 401) {
+  if (data.statusCode === 401 || data.statusCode === 403) {
     throw Object.assign(new Error("Session expired"), { code: "AUTH_EXPIRED" });
   }
   if (data.statusCode === 503) {
@@ -256,7 +276,7 @@ async function chunkedCloudTranscribe({
         "audio/mpeg",
         multipartFields
       );
-      const url = new URL(`${apiUrl}/api/transcribe`);
+      const url = new URL(eggheadsAuth.buildTranscriptionUrl(apiUrl));
 
       for (let attempt = 1; ; attempt++) {
         try {
@@ -823,10 +843,14 @@ class IPCHandlers {
     });
 
     ipcMain.handle("get-openai-key", async (event) => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getOpenAIKey();
     });
 
     ipcMain.handle("save-openai-key", async (event, key) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("OpenAI BYOK transcription");
+
       return this.environmentManager.saveOpenAIKey(key);
     });
 
@@ -937,6 +961,7 @@ class IPCHandlers {
 
     // Dictionary handlers
     ipcMain.on("auto-learn-changed", (_event, enabled) => {
+      if (EGGHEADS_DICTATION_ONLY) return;
       this._autoLearnEnabled = !!enabled;
       if (!this._autoLearnEnabled) {
         if (this._autoLearnDebounceTimer) {
@@ -949,10 +974,12 @@ class IPCHandlers {
     });
 
     ipcMain.handle("db-get-dictionary", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictionary persistence");
       return this.databaseManager.getDictionary();
     });
 
     ipcMain.handle("db-set-dictionary", async (event, words) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictionary persistence");
       if (!Array.isArray(words)) {
         throw new Error("words must be an array");
       }
@@ -960,34 +987,42 @@ class IPCHandlers {
     });
 
     ipcMain.handle("db-get-pending-dictionary", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictionary sync");
       return this.databaseManager.getPendingDictionary();
     });
 
     ipcMain.handle("db-get-pending-dictionary-deletes", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictionary sync");
       return this.databaseManager.getPendingDictionaryDeletes();
     });
 
     ipcMain.handle("db-get-dictionary-by-client-id", async (_event, clientDictId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictionary sync");
       return this.databaseManager.getDictionaryEntryByClientId(clientDictId);
     });
 
     ipcMain.handle("db-upsert-dictionary-from-cloud", async (_event, cloudEntry) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictionary sync");
       return this.databaseManager.upsertDictionaryFromCloud(cloudEntry);
     });
 
     ipcMain.handle("db-mark-dictionary-synced", async (_event, id, cloudId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictionary sync");
       return this.databaseManager.markDictionaryEntrySynced(id, cloudId);
     });
 
     ipcMain.handle("db-hard-delete-dictionary", async (_event, id) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictionary sync");
       return this.databaseManager.hardDeleteDictionaryEntry(id);
     });
 
     ipcMain.handle("db-clear-dictionary-cloud-id", async (_event, id) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictionary sync");
       return this.databaseManager.clearDictionaryCloudId(id);
     });
 
     ipcMain.handle("db-broadcast-dictionary-updated", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictionary sync");
       // Emit the normalized list straight from SQLite so renderers see the
       // post-dedupe truth, never a caller-supplied payload.
       const words = this.databaseManager.getDictionary();
@@ -996,10 +1031,12 @@ class IPCHandlers {
     });
 
     ipcMain.handle("db-get-snippets", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Snippets persistence");
       return this.databaseManager.getSnippets();
     });
 
     ipcMain.handle("db-set-snippets", async (_event, snippets) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Snippets persistence");
       if (!Array.isArray(snippets)) {
         throw new Error("snippets must be an array");
       }
@@ -1007,24 +1044,29 @@ class IPCHandlers {
     });
 
     ipcMain.handle("db-get-pending-snippets", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Snippets sync");
       return this.databaseManager.getPendingSnippets();
     });
 
     ipcMain.handle("db-get-pending-snippet-deletes", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Snippets sync");
       return this.databaseManager.getPendingSnippetDeletes();
     });
 
     ipcMain.handle("db-get-snippet-for-cloud-merge", async (_event, cloudEntry) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Snippets sync");
       return this.databaseManager.getSnippetForCloudMerge(cloudEntry);
     });
 
     ipcMain.handle("db-upsert-snippet-from-cloud", async (_event, cloudEntry) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Snippets sync");
       return this.databaseManager.upsertSnippetFromCloud(cloudEntry);
     });
 
     ipcMain.handle(
       "db-mark-snippet-synced",
       async (_event, id, cloudId, serverUpdatedAt, expectedTrigger, expectedReplacement) => {
+        if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Snippets sync");
         return this.databaseManager.markSnippetSynced(
           id,
           cloudId,
@@ -1036,20 +1078,24 @@ class IPCHandlers {
     );
 
     ipcMain.handle("db-hard-delete-snippet", async (_event, id) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Snippets sync");
       return this.databaseManager.hardDeleteSnippet(id);
     });
 
     ipcMain.handle("db-clear-snippet-cloud-id", async (_event, id) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Snippets sync");
       return this.databaseManager.clearSnippetCloudId(id);
     });
 
     ipcMain.handle("db-broadcast-snippets-updated", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Snippets sync");
       const snippets = this.databaseManager.getSnippets();
       this.broadcastToWindows("snippets-updated", snippets);
       return { success: true };
     });
 
     ipcMain.handle("undo-learned-corrections", async (_event, words) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictionary persistence");
       try {
         if (!Array.isArray(words) || words.length === 0) {
           return { success: false };
@@ -1080,6 +1126,7 @@ class IPCHandlers {
     ipcMain.handle(
       "db-save-note",
       async (event, title, content, noteType, sourceFile, audioDuration, folderId) => {
+        if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Notes persistence");
         const result = this.databaseManager.saveNote(
           title,
           content,
@@ -1098,14 +1145,17 @@ class IPCHandlers {
     );
 
     ipcMain.handle("db-get-note", async (event, id) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Notes persistence");
       return this.databaseManager.getNote(id);
     });
 
     ipcMain.handle("db-get-notes", async (event, noteType, limit, folderId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Notes persistence");
       return this.databaseManager.getNotes(noteType, limit, folderId);
     });
 
     ipcMain.handle("db-update-note", async (event, id, updates) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Notes persistence");
       const result = this.databaseManager.updateNote(id, updates);
       if (result?.success && result?.note) {
         setImmediate(() => this.broadcastToWindows("note-updated", result.note));
@@ -1117,14 +1167,17 @@ class IPCHandlers {
     });
 
     ipcMain.handle("db-delete-note", async (event, id) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Notes persistence");
       return this.deleteNoteInternal(id);
     });
 
     ipcMain.handle("db-search-notes", async (event, query, limit) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Notes persistence");
       return this.databaseManager.searchNotes(query, limit);
     });
 
     ipcMain.handle("db-semantic-search-notes", async (event, query, limit = 5) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Notes persistence");
       const vectorIndex = require("./vectorIndex");
       if (!vectorIndex.isReady()) {
         return this.databaseManager.searchNotes(query, limit);
@@ -1170,6 +1223,7 @@ class IPCHandlers {
     });
 
     ipcMain.handle("db-semantic-reindex-all", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Notes persistence");
       const vectorIndex = require("./vectorIndex");
       if (!vectorIndex.isReady()) return { success: false, error: "Vector index not ready" };
 
@@ -1183,14 +1237,17 @@ class IPCHandlers {
     });
 
     ipcMain.handle("db-update-note-cloud-id", async (event, id, cloudId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Notes persistence");
       return this.databaseManager.updateNoteCloudId(id, cloudId);
     });
 
     ipcMain.handle("db-get-folders", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Folder persistence");
       return this.databaseManager.getFolders();
     });
 
     ipcMain.handle("db-create-folder", async (event, name) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Folder persistence");
       const result = this.databaseManager.createFolder(name);
       if (result?.success && result?.folder) {
         setImmediate(() => {
@@ -1205,6 +1262,7 @@ class IPCHandlers {
     });
 
     ipcMain.handle("db-delete-folder", async (event, id) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Folder persistence");
       const folderName = this._noteFilesEnabled ? this._getFolderName(id) : null;
       const result = this.databaseManager.deleteFolder(id);
       if (result?.success) {
@@ -1223,6 +1281,7 @@ class IPCHandlers {
     });
 
     ipcMain.handle("db-rename-folder", async (event, id, name) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Folder persistence");
       const oldName = this._noteFilesEnabled ? this._getFolderName(id) : null;
       const result = this.databaseManager.renameFolder(id, name);
       if (result?.success && result?.folder) {
@@ -1238,6 +1297,7 @@ class IPCHandlers {
     });
 
     ipcMain.handle("db-get-folder-note-counts", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Folder persistence");
       return this.databaseManager.getFolderNoteCounts();
     });
 
@@ -1281,22 +1341,27 @@ class IPCHandlers {
 
     // Agent conversation handlers
     ipcMain.handle("db-create-agent-conversation", async (event, title, noteId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Agent conversation persistence");
       return this.databaseManager.createAgentConversation(title, noteId);
     });
 
     ipcMain.handle("db-get-conversations-for-note", async (event, noteId, limit) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Agent conversation persistence");
       return this.databaseManager.getConversationsForNote(noteId, limit);
     });
 
     ipcMain.handle("db-get-agent-conversations", async (event, limit) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Agent conversation persistence");
       return this.databaseManager.getAgentConversations(limit);
     });
 
     ipcMain.handle("db-get-agent-conversation", async (event, id) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Agent conversation persistence");
       return this.databaseManager.getAgentConversation(id);
     });
 
     ipcMain.handle("db-delete-agent-conversation", async (event, id) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Agent conversation persistence");
       const result = this.databaseManager.deleteAgentConversation(id);
       if (this.vectorIndex?.isReady?.()) {
         this.vectorIndex.deleteConversationChunks(id).catch(() => {});
@@ -1305,12 +1370,14 @@ class IPCHandlers {
     });
 
     ipcMain.handle("db-update-agent-conversation-title", async (event, id, title) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Agent conversation persistence");
       return this.databaseManager.updateAgentConversationTitle(id, title);
     });
 
     ipcMain.handle(
       "db-add-agent-message",
       async (event, conversationId, role, content, metadata) => {
+        if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Agent conversation persistence");
         const result = this.databaseManager.addAgentMessage(
           conversationId,
           role,
@@ -1330,12 +1397,14 @@ class IPCHandlers {
     );
 
     ipcMain.handle("db-get-agent-messages", async (event, conversationId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Agent conversation persistence");
       return this.databaseManager.getAgentMessages(conversationId);
     });
 
     ipcMain.handle(
       "db-get-agent-conversations-with-preview",
       async (event, limit, offset, includeArchived) => {
+        if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Agent conversation persistence");
         return this.databaseManager.getAgentConversationsWithPreview(
           limit,
           offset,
@@ -1345,22 +1414,27 @@ class IPCHandlers {
     );
 
     ipcMain.handle("db-search-agent-conversations", async (event, query, limit) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Agent conversation persistence");
       return this.databaseManager.searchAgentConversations(query, limit);
     });
 
     ipcMain.handle("db-archive-agent-conversation", async (event, id) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Agent conversation persistence");
       return this.databaseManager.archiveAgentConversation(id);
     });
 
     ipcMain.handle("db-unarchive-agent-conversation", async (event, id) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Agent conversation persistence");
       return this.databaseManager.unarchiveAgentConversation(id);
     });
 
     ipcMain.handle("db-update-agent-conversation-cloud-id", async (event, id, cloudId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Agent conversation persistence");
       return this.databaseManager.updateAgentConversationCloudId(id, cloudId);
     });
 
     ipcMain.handle("db-semantic-search-conversations", async (event, query, limit) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Agent conversation persistence");
       if (this.vectorIndex?.isReady?.()) {
         try {
           const vectorResults = await this.vectorIndex.searchConversations(query, limit);
@@ -1384,23 +1458,32 @@ class IPCHandlers {
     });
 
     // Notes sync
-    ipcMain.handle("db-get-pending-notes", () => this.databaseManager.getPendingNotes());
-    ipcMain.handle("db-get-pending-note-deletes", () =>
-      this.databaseManager.getPendingNoteDeletes()
-    );
-    ipcMain.handle("db-get-note-by-client-id", (_, clientNoteId) =>
-      this.databaseManager.getNoteByClientId(clientNoteId)
-    );
-    ipcMain.handle("db-upsert-note-from-cloud", (_, cloudNote, localFolderId) =>
-      this.databaseManager.upsertNoteFromCloud(cloudNote, localFolderId)
-    );
-    ipcMain.handle("db-mark-note-synced", (_, id, cloudId) =>
-      this.databaseManager.markNoteSynced(id, cloudId)
-    );
-    ipcMain.handle("db-mark-note-sync-error", (_, id) =>
-      this.databaseManager.markNoteSyncError(id)
-    );
+    ipcMain.handle("db-get-pending-notes", () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Notes sync");
+      return this.databaseManager.getPendingNotes();
+    });
+    ipcMain.handle("db-get-pending-note-deletes", () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Notes sync");
+      return this.databaseManager.getPendingNoteDeletes();
+    });
+    ipcMain.handle("db-get-note-by-client-id", (_, clientNoteId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Notes sync");
+      return this.databaseManager.getNoteByClientId(clientNoteId);
+    });
+    ipcMain.handle("db-upsert-note-from-cloud", (_, cloudNote, localFolderId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Notes sync");
+      return this.databaseManager.upsertNoteFromCloud(cloudNote, localFolderId);
+    });
+    ipcMain.handle("db-mark-note-synced", (_, id, cloudId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Notes sync");
+      return this.databaseManager.markNoteSynced(id, cloudId);
+    });
+    ipcMain.handle("db-mark-note-sync-error", (_, id) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Notes sync");
+      return this.databaseManager.markNoteSyncError(id);
+    });
     ipcMain.handle("db-hard-delete-note", (_, id) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Notes sync");
       const result = this.databaseManager.hardDeleteNote(id);
       if (result?.success) {
         this._asyncVectorDelete(id);
@@ -1411,24 +1494,36 @@ class IPCHandlers {
     });
 
     // Folders sync
-    ipcMain.handle("db-get-pending-folders", () => this.databaseManager.getPendingFolders());
-    ipcMain.handle("db-get-folder-by-client-id", (_, clientFolderId) =>
-      this.databaseManager.getFolderByClientId(clientFolderId)
-    );
-    ipcMain.handle("db-upsert-folder-from-cloud", (_, cloudFolder) =>
-      this.databaseManager.upsertFolderFromCloud(cloudFolder)
-    );
-    ipcMain.handle("db-mark-folder-synced", (_, id, cloudId) =>
-      this.databaseManager.markFolderSynced(id, cloudId)
-    );
-    ipcMain.handle("db-adopt-folder-identity", (_, id, clientFolderId, cloudId, updatedAt) =>
-      this.databaseManager.adoptFolderIdentity(id, clientFolderId, cloudId, updatedAt)
-    );
-    ipcMain.handle("db-get-folder-id-map", () => this.databaseManager.getFolderIdMap());
-    ipcMain.handle("db-get-pending-folder-deletes", () =>
-      this.databaseManager.getPendingFolderDeletes()
-    );
+    ipcMain.handle("db-get-pending-folders", () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Folders sync");
+      return this.databaseManager.getPendingFolders();
+    });
+    ipcMain.handle("db-get-folder-by-client-id", (_, clientFolderId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Folders sync");
+      return this.databaseManager.getFolderByClientId(clientFolderId);
+    });
+    ipcMain.handle("db-upsert-folder-from-cloud", (_, cloudFolder) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Folders sync");
+      return this.databaseManager.upsertFolderFromCloud(cloudFolder);
+    });
+    ipcMain.handle("db-mark-folder-synced", (_, id, cloudId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Folders sync");
+      return this.databaseManager.markFolderSynced(id, cloudId);
+    });
+    ipcMain.handle("db-adopt-folder-identity", (_, id, clientFolderId, cloudId, updatedAt) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Folders sync");
+      return this.databaseManager.adoptFolderIdentity(id, clientFolderId, cloudId, updatedAt);
+    });
+    ipcMain.handle("db-get-folder-id-map", () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Folders sync");
+      return this.databaseManager.getFolderIdMap();
+    });
+    ipcMain.handle("db-get-pending-folder-deletes", () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Folders sync");
+      return this.databaseManager.getPendingFolderDeletes();
+    });
     ipcMain.handle("db-hard-delete-folder", (_, id) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Folders sync");
       const result = this.databaseManager.hardDeleteFolder(id);
       if (result?.success) {
         for (const noteId of result.noteIds ?? []) {
@@ -1446,22 +1541,28 @@ class IPCHandlers {
     });
 
     // Conversations sync
-    ipcMain.handle("db-get-pending-conversations", () =>
-      this.databaseManager.getPendingConversations()
-    );
-    ipcMain.handle("db-get-pending-conversation-deletes", () =>
-      this.databaseManager.getPendingConversationDeletes()
-    );
-    ipcMain.handle("db-get-conversation-by-client-id", (_, clientId) =>
-      this.databaseManager.getConversationByClientId(clientId)
-    );
-    ipcMain.handle("db-upsert-conversation-from-cloud", (_, cloudConv, messages) =>
-      this.databaseManager.upsertConversationFromCloud(cloudConv, messages)
-    );
-    ipcMain.handle("db-mark-conversation-synced", (_, id, cloudId) =>
-      this.databaseManager.markConversationSynced(id, cloudId)
-    );
+    ipcMain.handle("db-get-pending-conversations", () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Conversation sync");
+      return this.databaseManager.getPendingConversations();
+    });
+    ipcMain.handle("db-get-pending-conversation-deletes", () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Conversation sync");
+      return this.databaseManager.getPendingConversationDeletes();
+    });
+    ipcMain.handle("db-get-conversation-by-client-id", (_, clientId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Conversation sync");
+      return this.databaseManager.getConversationByClientId(clientId);
+    });
+    ipcMain.handle("db-upsert-conversation-from-cloud", (_, cloudConv, messages) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Conversation sync");
+      return this.databaseManager.upsertConversationFromCloud(cloudConv, messages);
+    });
+    ipcMain.handle("db-mark-conversation-synced", (_, id, cloudId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Conversation sync");
+      return this.databaseManager.markConversationSynced(id, cloudId);
+    });
     ipcMain.handle("db-hard-delete-conversation", (_, id) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Conversation sync");
       const result = this.databaseManager.hardDeleteConversation(id);
       if (result?.success) {
         setImmediate(() => this.broadcastToWindows("conversation-deleted", { id }));
@@ -1494,6 +1595,7 @@ class IPCHandlers {
     });
 
     ipcMain.handle("export-note", async (event, noteId, format) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Notes export");
       try {
         const note = this.databaseManager.getNote(noteId);
         if (!note) return { success: false, error: "Note not found" };
@@ -1535,6 +1637,7 @@ class IPCHandlers {
     });
 
     ipcMain.handle("export-transcript", async (event, noteId, format) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Notes export");
       try {
         const note = this.databaseManager.getNote(noteId);
         if (!note) return { success: false, error: "Note not found" };
@@ -1583,6 +1686,7 @@ class IPCHandlers {
     });
 
     ipcMain.handle("export-dictionary", async (event, words) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictionary export");
       try {
         const { dialog } = require("electron");
         const fs = require("fs");
@@ -1603,6 +1707,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("select-audio-file", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Audio file transcription");
+
       const { dialog } = require("electron");
       const result = await dialog.showOpenDialog({
         properties: ["openFile"],
@@ -1620,6 +1726,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("get-file-size", async (_event, filePath) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Audio file transcription");
+
       const fs = require("fs");
       try {
         const stats = fs.statSync(filePath);
@@ -1630,6 +1738,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("transcribe-audio-file", async (event, filePath, options = {}) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Audio file transcription");
+
       const fs = require("fs");
       try {
         const audioBuffer = fs.readFileSync(filePath);
@@ -1724,6 +1834,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("transcribe-local-whisper", async (event, audioBlob, options = {}) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Local Whisper");
+
       debugLogger.log("transcribe-local-whisper called", {
         audioBlobType: typeof audioBlob,
         audioBlobSize: audioBlob?.byteLength || audioBlob?.length || 0,
@@ -1806,14 +1918,24 @@ class IPCHandlers {
     });
 
     ipcMain.handle("check-whisper-installation", async (event) => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return {
+          installed: false,
+          working: false,
+          error: "Local Whisper is disabled in EGGHEADS Dictation",
+        };
+      }
       return this.whisperManager.checkWhisperInstallation();
     });
 
     ipcMain.handle("get-audio-diagnostics", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyUnavailable("Local audio diagnostics");
       return this.whisperManager.getDiagnostics();
     });
 
     ipcMain.handle("download-whisper-model", async (event, modelName) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Local Whisper model downloads");
+
       try {
         const result = await this.whisperManager.downloadWhisperModel(modelName, (progressData) => {
           if (!event.sender.isDestroyed()) {
@@ -1839,50 +1961,80 @@ class IPCHandlers {
     });
 
     ipcMain.handle("check-model-status", async (event, modelName) => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return {
+          success: false,
+          model: modelName,
+          downloaded: false,
+          code: DICTATION_ONLY_DISABLED_CODE,
+          error: "Local Whisper models are disabled in EGGHEADS Dictation",
+        };
+      }
       return this.whisperManager.checkModelStatus(modelName);
     });
 
     ipcMain.handle("list-whisper-models", async (event) => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return {
+          success: false,
+          models: [],
+          cache_dir: "",
+          code: DICTATION_ONLY_DISABLED_CODE,
+          error: "Local Whisper models are disabled in EGGHEADS Dictation",
+        };
+      }
       return this.whisperManager.listWhisperModels();
     });
 
     ipcMain.handle("delete-whisper-model", async (event, modelName) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Local Whisper models");
       return this.whisperManager.deleteWhisperModel(modelName);
     });
 
     ipcMain.handle("delete-all-whisper-models", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Local Whisper models");
       return this.whisperManager.deleteAllWhisperModels();
     });
 
     ipcMain.handle("cancel-whisper-download", async (event) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Local Whisper model downloads");
       return this.whisperManager.cancelDownload();
     });
 
     ipcMain.handle("whisper-server-start", async (event, modelName) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Whisper server");
       const useCuda =
         process.env.WHISPER_CUDA_ENABLED === "true" && this.whisperCudaManager?.isDownloaded();
       return this.whisperManager.startServer(modelName, { useCuda });
     });
 
     ipcMain.handle("whisper-server-stop", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Whisper server");
       return this.whisperManager.stopServer();
     });
 
     ipcMain.handle("whisper-server-status", async () => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return { available: false, running: false, code: DICTATION_ONLY_DISABLED_CODE };
+      }
       return this.whisperManager.getServerStatus();
     });
 
     ipcMain.handle("detect-gpu", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return { hasNvidiaGpu: false };
       const { detectNvidiaGpu } = require("../utils/gpuDetection");
       return detectNvidiaGpu();
     });
 
     ipcMain.handle("list-gpus", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return [];
       const { listNvidiaGpus } = require("../utils/gpuDetection");
       return listNvidiaGpus();
     });
 
     ipcMain.handle("set-gpu-device-index", async (_event, purpose, uuid) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Local GPU selection");
+
       if (purpose !== "transcription" && purpose !== "intelligence") {
         return { success: false };
       }
@@ -1941,6 +2093,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("get-gpu-device-index", async (_event, purpose) => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       if (purpose !== "transcription" && purpose !== "intelligence") {
         return "";
       }
@@ -1949,6 +2103,15 @@ class IPCHandlers {
     });
 
     ipcMain.handle("get-cuda-whisper-status", async () => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return {
+          downloaded: false,
+          downloading: false,
+          path: null,
+          gpuInfo: { hasNvidiaGpu: false },
+          code: DICTATION_ONLY_DISABLED_CODE,
+        };
+      }
       const { detectNvidiaGpu } = require("../utils/gpuDetection");
       const gpuInfo = await detectNvidiaGpu();
       if (!this.whisperCudaManager) {
@@ -1963,6 +2126,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("download-cuda-whisper-binary", async (event) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("CUDA Whisper");
+
       if (!this.whisperCudaManager) {
         return { success: false, error: "CUDA not supported on this platform" };
       }
@@ -1990,11 +2155,13 @@ class IPCHandlers {
     });
 
     ipcMain.handle("cancel-cuda-whisper-download", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("CUDA Whisper");
       if (!this.whisperCudaManager) return { success: false };
       return this.whisperCudaManager.cancelDownload();
     });
 
     ipcMain.handle("delete-cuda-whisper-binary", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("CUDA Whisper");
       if (!this.whisperCudaManager) return { success: false };
       const result = await this.whisperCudaManager.delete();
       if (result.success) {
@@ -2010,6 +2177,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("transcribe-local-parakeet", async (event, audioBlob, options = {}) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Local Parakeet");
+
       debugLogger.log("transcribe-local-parakeet called", {
         audioBlobType: typeof audioBlob,
         audioBlobSize: audioBlob?.byteLength || audioBlob?.length || 0,
@@ -2056,10 +2225,19 @@ class IPCHandlers {
     });
 
     ipcMain.handle("check-parakeet-installation", async () => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return {
+          installed: false,
+          working: false,
+          error: "Parakeet is disabled in EGGHEADS Dictation",
+        };
+      }
       return this.parakeetManager.checkInstallation();
     });
 
     ipcMain.handle("download-parakeet-model", async (event, modelName) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Parakeet model downloads");
+
       try {
         const result = await this.parakeetManager.downloadParakeetModel(
           modelName,
@@ -2088,30 +2266,54 @@ class IPCHandlers {
     });
 
     ipcMain.handle("check-parakeet-model-status", async (_event, modelName) => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return {
+          success: false,
+          model: modelName,
+          downloaded: false,
+          code: DICTATION_ONLY_DISABLED_CODE,
+          error: "Parakeet models are disabled in EGGHEADS Dictation",
+        };
+      }
       return this.parakeetManager.checkModelStatus(modelName);
     });
 
     ipcMain.handle("list-parakeet-models", async () => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return {
+          success: false,
+          models: [],
+          cache_dir: "",
+          code: DICTATION_ONLY_DISABLED_CODE,
+          error: "Parakeet models are disabled in EGGHEADS Dictation",
+        };
+      }
       return this.parakeetManager.listParakeetModels();
     });
 
     ipcMain.handle("delete-parakeet-model", async (_event, modelName) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Parakeet models");
       return this.parakeetManager.deleteParakeetModel(modelName);
     });
 
     ipcMain.handle("delete-all-parakeet-models", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Parakeet models");
       return this.parakeetManager.deleteAllParakeetModels();
     });
 
     ipcMain.handle("cancel-parakeet-download", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Parakeet model downloads");
       return this.parakeetManager.cancelDownload();
     });
 
     ipcMain.handle("get-parakeet-diagnostics", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyUnavailable("Parakeet diagnostics");
       return this.parakeetManager.getDiagnostics();
     });
 
     ipcMain.handle("parakeet-server-start", async (event, modelName) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Parakeet server");
+
       const result = await this.parakeetManager.startServer(modelName);
       process.env.LOCAL_TRANSCRIPTION_PROVIDER = "nvidia";
       process.env.PARAKEET_MODEL = modelName;
@@ -2120,6 +2322,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("parakeet-server-stop", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Parakeet server");
+
       const result = await this.parakeetManager.stopServer();
       delete process.env.LOCAL_TRANSCRIPTION_PROVIDER;
       delete process.env.PARAKEET_MODEL;
@@ -2128,11 +2332,16 @@ class IPCHandlers {
     });
 
     ipcMain.handle("parakeet-server-status", async () => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return { available: false, running: false, code: DICTATION_ONLY_DISABLED_CODE };
+      }
       return this.parakeetManager.getServerStatus();
     });
 
     // Diarization model management
     ipcMain.handle("download-diarization-models", async (event) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Diarization models");
+
       try {
         const result = await this.diarizationManager.downloadModels((progressData) => {
           if (!event.sender.isDestroyed()) {
@@ -2157,6 +2366,9 @@ class IPCHandlers {
     });
 
     ipcMain.handle("get-diarization-model-status", async () => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return { available: false, modelsDownloaded: false, code: DICTATION_ONLY_DISABLED_CODE };
+      }
       return {
         available: this.diarizationManager?.isAvailable() ?? false,
         modelsDownloaded:
@@ -2166,6 +2378,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("delete-diarization-models", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Diarization models");
+
       try {
         await this.diarizationManager.deleteModels();
         return { success: true };
@@ -2176,6 +2390,7 @@ class IPCHandlers {
     });
 
     ipcMain.handle("cancel-diarization-download", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Diarization models");
       return this.diarizationManager.cancelDownload();
     });
 
@@ -2529,6 +2744,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("model-get-all", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return [];
+
       try {
         debugLogger.debug("model-get-all called", undefined, "ipc");
         const modelManager = require("./modelManagerBridge").default;
@@ -2542,11 +2759,15 @@ class IPCHandlers {
     });
 
     ipcMain.handle("model-check", async (_, modelId) => {
+      if (EGGHEADS_DICTATION_ONLY) return false;
+
       const modelManager = require("./modelManagerBridge").default;
       return modelManager.isModelDownloaded(modelId);
     });
 
     ipcMain.handle("model-download", async (event, modelId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Local AI model downloads");
+
       try {
         const modelManager = require("./modelManagerBridge").default;
         const result = await modelManager.downloadModel(
@@ -2574,6 +2795,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("model-delete", async (event, modelId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Local AI models");
+
       try {
         const modelManager = require("./modelManagerBridge").default;
         await modelManager.deleteModel(modelId);
@@ -2589,6 +2812,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("model-delete-all", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Local AI models");
+
       try {
         const modelManager = require("./modelManagerBridge").default;
         await modelManager.deleteAllModels();
@@ -2604,6 +2829,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("model-cancel-download", async (event, modelId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Local AI model downloads");
+
       try {
         const modelManager = require("./modelManagerBridge").default;
         const cancelled = modelManager.cancelDownload(modelId);
@@ -2617,6 +2844,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("model-check-runtime", async (event) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyUnavailable("Local AI model runtime");
+
       try {
         const modelManager = require("./modelManagerBridge").default;
         await modelManager.ensureLlamaCpp();
@@ -2632,36 +2861,52 @@ class IPCHandlers {
     });
 
     ipcMain.handle("get-anthropic-key", async (event) => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getAnthropicKey();
     });
 
     ipcMain.handle("get-gemini-key", async (event) => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getGeminiKey();
     });
 
     ipcMain.handle("save-gemini-key", async (event, key) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Gemini BYOK reasoning");
+
       return this.environmentManager.saveGeminiKey(key);
     });
 
     ipcMain.handle("get-groq-key", async (event) => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getGroqKey();
     });
 
     ipcMain.handle("save-groq-key", async (event, key) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Groq BYOK transcription");
+
       return this.environmentManager.saveGroqKey(key);
     });
 
     ipcMain.handle("get-xai-key", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getXaiKey();
     });
 
     ipcMain.handle("save-xai-key", async (event, key) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("xAI BYOK transcription");
+
       return this.environmentManager.saveXaiKey(key);
     });
 
     ipcMain.handle(
       "proxy-xai-transcription",
       async (event, { audioBuffer, language, keyterms }) => {
+        if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("xAI BYOK transcription");
+
         const apiKey = this.environmentManager.getXaiKey();
         if (!apiKey) {
           throw new Error("xAI API key not configured");
@@ -2696,16 +2941,22 @@ class IPCHandlers {
     );
 
     ipcMain.handle("get-mistral-key", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getMistralKey();
     });
 
     ipcMain.handle("save-mistral-key", async (event, key) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Mistral BYOK transcription");
+
       return this.environmentManager.saveMistralKey(key);
     });
 
     ipcMain.handle(
       "proxy-mistral-transcription",
       async (event, { audioBuffer, model, language, contextBias }) => {
+        if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Mistral BYOK transcription");
+
         const apiKey = this.environmentManager.getMistralKey();
         if (!apiKey) {
           throw new Error("Mistral API key not configured");
@@ -2742,24 +2993,34 @@ class IPCHandlers {
     );
 
     ipcMain.handle("get-corti-client-id", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getCortiClientId();
     });
 
     ipcMain.handle("save-corti-client-id", async (event, key) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Corti BYOK transcription");
+
       return this.environmentManager.saveCortiClientId(key);
     });
 
     ipcMain.handle("get-corti-client-secret", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getCortiClientSecret();
     });
 
     ipcMain.handle("save-corti-client-secret", async (event, key) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Corti BYOK transcription");
+
       return this.environmentManager.saveCortiClientSecret(key);
     });
 
     ipcMain.handle(
       "proxy-corti-transcription",
       async (event, { audioBuffer, language, environment, tenant }) => {
+        if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Corti BYOK transcription");
+
         const clientId = this.environmentManager.getCortiClientId();
         const clientSecret = this.environmentManager.getCortiClientSecret();
         if (!clientId || !clientSecret) {
@@ -2779,105 +3040,167 @@ class IPCHandlers {
     );
 
     ipcMain.handle("get-tinfoil-key", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getTinfoilKey();
     });
 
     ipcMain.handle("save-tinfoil-key", async (event, key) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Tinfoil realtime");
+
       return this.environmentManager.saveTinfoilKey(key);
     });
 
     ipcMain.handle("get-custom-transcription-key", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getCustomTranscriptionKey();
     });
 
     ipcMain.handle("save-custom-transcription-key", async (event, key) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Custom BYOK transcription");
+
       return this.environmentManager.saveCustomTranscriptionKey(key);
     });
 
     ipcMain.handle("get-cleanup-custom-key", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getCleanupCustomKey();
     });
 
     ipcMain.handle("save-cleanup-custom-key", async (event, key) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Custom cleanup provider");
+
       return this.environmentManager.saveCleanupCustomKey(key);
     });
 
     // Enterprise provider key handlers
     ipcMain.handle("get-bedrock-region", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getBedrockRegion();
     });
     ipcMain.handle("save-bedrock-region", async (event, value) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Bedrock enterprise provider");
+
       return this.environmentManager.saveBedrockRegion(value);
     });
     ipcMain.handle("get-bedrock-profile", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getBedrockProfile();
     });
     ipcMain.handle("save-bedrock-profile", async (event, value) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Bedrock enterprise provider");
+
       return this.environmentManager.saveBedrockProfile(value);
     });
     ipcMain.handle("get-bedrock-access-key-id", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getBedrockAccessKeyId();
     });
     ipcMain.handle("save-bedrock-access-key-id", async (event, key) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Bedrock enterprise provider");
+
       return this.environmentManager.saveBedrockAccessKeyId(key);
     });
     ipcMain.handle("get-bedrock-secret-access-key", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getBedrockSecretAccessKey();
     });
     ipcMain.handle("save-bedrock-secret-access-key", async (event, key) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Bedrock enterprise provider");
+
       return this.environmentManager.saveBedrockSecretAccessKey(key);
     });
     ipcMain.handle("get-bedrock-session-token", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getBedrockSessionToken();
     });
     ipcMain.handle("save-bedrock-session-token", async (event, key) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Bedrock enterprise provider");
+
       return this.environmentManager.saveBedrockSessionToken(key);
     });
     ipcMain.handle("get-azure-endpoint", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getAzureEndpoint();
     });
     ipcMain.handle("save-azure-endpoint", async (event, value) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Azure enterprise provider");
+
       return this.environmentManager.saveAzureEndpoint(value);
     });
     ipcMain.handle("get-azure-api-key", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getAzureApiKey();
     });
     ipcMain.handle("save-azure-api-key", async (event, key) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Azure enterprise provider");
+
       return this.environmentManager.saveAzureApiKey(key);
     });
     ipcMain.handle("get-azure-deployment", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getAzureDeployment();
     });
     ipcMain.handle("save-azure-deployment", async (event, value) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Azure enterprise provider");
+
       return this.environmentManager.saveAzureDeployment(value);
     });
     ipcMain.handle("get-azure-api-version", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getAzureApiVersion();
     });
     ipcMain.handle("save-azure-api-version", async (event, value) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Azure enterprise provider");
+
       return this.environmentManager.saveAzureApiVersion(value);
     });
     ipcMain.handle("get-vertex-project", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getVertexProject();
     });
     ipcMain.handle("save-vertex-project", async (event, value) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Vertex enterprise provider");
+
       return this.environmentManager.saveVertexProject(value);
     });
     ipcMain.handle("get-vertex-location", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getVertexLocation();
     });
     ipcMain.handle("save-vertex-location", async (event, value) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Vertex enterprise provider");
+
       return this.environmentManager.saveVertexLocation(value);
     });
     ipcMain.handle("get-vertex-api-key", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
+
       return this.environmentManager.getVertexApiKey();
     });
     ipcMain.handle("save-vertex-api-key", async (event, key) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Vertex enterprise provider");
+
       return this.environmentManager.saveVertexApiKey(key);
     });
 
     // Enterprise provider test connection
     ipcMain.handle("test-enterprise-connection", async (event, provider, config) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Enterprise provider test");
+
       const {
         mapEnterpriseError,
         pickEnterpriseConfig,
@@ -2918,6 +3241,8 @@ class IPCHandlers {
     ipcMain.handle(
       "process-enterprise-reasoning",
       async (event, text, modelId, _agentName, config) => {
+        if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Enterprise reasoning");
+
         const {
           isEnterpriseProvider,
           mapEnterpriseError,
@@ -2992,6 +3317,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("save-anthropic-key", async (event, key) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Anthropic BYOK reasoning");
+
       return this.environmentManager.saveAnthropicKey(key);
     });
 
@@ -3105,6 +3432,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("process-local-reasoning", async (event, text, modelId, _agentName, config) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Local reasoning");
+
       try {
         const LocalReasoningService = require("../services/localReasoningBridge").default;
         const result = await LocalReasoningService.processText(text, modelId, config);
@@ -3117,6 +3446,8 @@ class IPCHandlers {
     ipcMain.handle(
       "process-anthropic-reasoning",
       async (event, text, modelId, _agentName, config) => {
+        if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Anthropic reasoning");
+
         try {
           const apiKey = this.environmentManager.getAnthropicKey();
 
@@ -3174,6 +3505,8 @@ class IPCHandlers {
     );
 
     ipcMain.handle("check-local-reasoning-available", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return false;
+
       try {
         const LocalReasoningService = require("../services/localReasoningBridge").default;
         return await LocalReasoningService.isAvailable();
@@ -3183,6 +3516,10 @@ class IPCHandlers {
     });
 
     ipcMain.handle("llama-cpp-check", async () => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return { isInstalled: false, error: "llama.cpp is disabled in EGGHEADS Dictation" };
+      }
+
       try {
         const llamaCppInstaller = require("./llamaCppInstaller").default;
         const isInstalled = await llamaCppInstaller.isInstalled();
@@ -3194,6 +3531,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("llama-cpp-install", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("llama.cpp");
+
       try {
         const llamaCppInstaller = require("./llamaCppInstaller").default;
         const result = await llamaCppInstaller.install();
@@ -3204,6 +3543,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("llama-cpp-uninstall", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("llama.cpp");
+
       try {
         const llamaCppInstaller = require("./llamaCppInstaller").default;
         const result = await llamaCppInstaller.uninstall();
@@ -3214,6 +3555,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("llama-server-start", async (event, modelId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("llama-server");
+
       try {
         const modelManager = require("./modelManagerBridge").default;
         modelManager.ensureInitialized();
@@ -3235,6 +3578,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("llama-server-stop", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("llama-server");
+
       try {
         const modelManager = require("./modelManagerBridge").default;
         await modelManager.stopServer();
@@ -3245,6 +3590,10 @@ class IPCHandlers {
     });
 
     ipcMain.handle("llama-server-status", async () => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return { available: false, running: false, code: DICTATION_ONLY_DISABLED_CODE };
+      }
+
       try {
         const modelManager = require("./modelManagerBridge").default;
         return modelManager.getServerStatus();
@@ -3254,6 +3603,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("llama-gpu-reset", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("llama-server GPU reset");
+
       try {
         const modelManager = require("./modelManagerBridge").default;
         const previousModelId = modelManager.currentServerModelId;
@@ -3272,6 +3623,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("detect-vulkan-gpu", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return { available: false, code: DICTATION_ONLY_DISABLED_CODE };
+
       try {
         const { detectVulkanGpu } = require("../utils/vulkanDetection");
         return await detectVulkanGpu();
@@ -3281,6 +3634,10 @@ class IPCHandlers {
     });
 
     ipcMain.handle("get-llama-vulkan-status", async () => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return { supported: false, downloaded: false, code: DICTATION_ONLY_DISABLED_CODE };
+      }
+
       try {
         if (!this._llamaVulkanManager) {
           const LlamaVulkanManager = require("./llamaVulkanManager");
@@ -3293,6 +3650,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("download-llama-vulkan-binary", async (event) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("llama Vulkan runtime");
+
       try {
         if (!this._llamaVulkanManager) {
           const LlamaVulkanManager = require("./llamaVulkanManager");
@@ -3339,6 +3698,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("cancel-llama-vulkan-download", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("llama Vulkan runtime");
+
       if (this._llamaVulkanManager) {
         return { success: this._llamaVulkanManager.cancelDownload() };
       }
@@ -3346,6 +3707,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("delete-llama-vulkan-binary", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("llama Vulkan runtime");
+
       try {
         if (!this._llamaVulkanManager) {
           const LlamaVulkanManager = require("./llamaVulkanManager");
@@ -3426,7 +3789,10 @@ class IPCHandlers {
     ipcMain.handle("open-microphone-settings", () => openSystemSettings("microphone"));
     ipcMain.handle("open-sound-input-settings", () => openSystemSettings("sound"));
     ipcMain.handle("open-accessibility-settings", () => openSystemSettings("accessibility"));
-    ipcMain.handle("open-system-audio-settings", () => openSystemSettings("systemAudio"));
+    ipcMain.handle("open-system-audio-settings", () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("System audio settings");
+      return openSystemSettings("systemAudio");
+    });
 
     ipcMain.handle("toggle-media-playback", () => {
       const mediaPlayer = require("./mediaPlayer");
@@ -3545,9 +3911,18 @@ class IPCHandlers {
       });
     };
 
-    ipcMain.handle("check-system-audio-access", () => getSystemAudioAccess());
+    ipcMain.handle("check-system-audio-access", () => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return buildSystemAudioAccess({ code: DICTATION_ONLY_DISABLED_CODE });
+      }
+      return getSystemAudioAccess();
+    });
 
     ipcMain.handle("request-system-audio-access", async () => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return buildSystemAudioAccess({ code: DICTATION_ONLY_DISABLED_CODE });
+      }
+
       if (process.platform === "win32") {
         return getWindowsSystemAudioAccess();
       }
@@ -3590,12 +3965,30 @@ class IPCHandlers {
         const win = BrowserWindow.fromWebContents(event.sender);
         if (win) {
           await win.webContents.session.clearStorageData({ storages: ["cookies"] });
+          win.webContents.send("auth-session-changed", null);
         }
         return { success: true };
       } catch (error) {
         debugLogger.error("Failed to clear auth session:", error);
         return { success: false, error: error.message };
       }
+    });
+
+    ipcMain.handle("auth-start", async () => {
+      try {
+        return await eggheadsAuth.openAuthHandoff({
+          protocol: this.oauthProtocol,
+          runtimeEnv,
+        });
+      } catch (error) {
+        debugLogger.error("Failed to start EGGHEADS auth:", error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle("auth-get-session", () => {
+      const user = tokenStore.getUser();
+      return user ? { signedIn: true, user } : { signedIn: false, user: null };
     });
 
     ipcMain.handle("auth-get-token", () => tokenStore.get());
@@ -3623,17 +4016,9 @@ class IPCHandlers {
       return {};
     })();
 
-    const getApiUrl = () =>
-      process.env.OPENWHISPR_API_URL ||
-      process.env.VITE_OPENWHISPR_API_URL ||
-      runtimeEnv.VITE_OPENWHISPR_API_URL ||
-      "";
+    const getApiUrl = () => eggheadsAuth.getApiBaseUrl(runtimeEnv);
 
-    const getAuthUrl = () =>
-      process.env.AUTH_URL ||
-      process.env.VITE_AUTH_URL ||
-      runtimeEnv.VITE_AUTH_URL ||
-      "https://auth.openwhispr.com";
+    const getAuthUrl = () => eggheadsAuth.getAuthBaseUrl(runtimeEnv);
 
     const getSessionCookiesFromWindow = async (win) => {
       const scopedUrls = [getAuthUrl(), getApiUrl()].filter(Boolean);
@@ -3691,9 +4076,8 @@ class IPCHandlers {
     // main.js's startup migration bridge runs (or if it failed for this user).
     const getAuthHeaderFromWindow = async (win) => {
       const token = tokenStore.get();
-      if (token) return { Authorization: `Bearer ${token}` };
-      const cookieHeader = win ? await getSessionCookiesFromWindow(win) : "";
-      return cookieHeader ? { Cookie: cookieHeader } : {};
+      if (eggheadsAuth.isEggheadsToken(token)) return { Authorization: `Bearer ${token}` };
+      return {};
     };
 
     const getAuthHeader = async (event) => {
@@ -3708,7 +4092,7 @@ class IPCHandlers {
     ipcMain.handle("cloud-transcribe", async (event, audioBuffer, opts = {}) => {
       try {
         const apiUrl = getApiUrl();
-        if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
+        if (!apiUrl) throw new Error("EGGHEADS API URL not configured");
 
         const authHeader = await getAuthHeader(event);
         if (!Object.keys(authHeader).length) throw new Error("Not authenticated");
@@ -3719,8 +4103,7 @@ class IPCHandlers {
         const clientTranscriptionId = crypto.randomUUID();
         const multipartFields = {
           language: opts.language,
-          prompt: opts.prompt,
-          sendLogs: opts.sendLogs,
+          model: "whisper-1",
           clientType: "desktop",
           appVersion: app.getVersion(),
           clientVersion: app.getVersion(),
@@ -3730,39 +4113,13 @@ class IPCHandlers {
 
         debugLogger.debug("Cloud transcribe request", { audioSize: audioData.length }, "cloud-api");
 
-        if (audioData.length > CLOUD_INLINE_LIMIT) {
-          const { text, responses, lastResponse, warning } = await chunkedCloudTranscribe({
-            buffer: audioData,
-            apiUrl,
-            authHeader,
-            multipartFields,
-          });
-          const sum = (field) => responses.reduce((s, r) => s + (r?.[field] || 0), 0);
-          return {
-            success: true,
-            text,
-            ...(warning ? { warning } : {}),
-            clientTranscriptionId,
-            wordsUsed: lastResponse?.wordsUsed,
-            wordsRemaining: lastResponse?.wordsRemaining,
-            plan: lastResponse?.plan,
-            limitReached: lastResponse?.limitReached || false,
-            sttProvider: lastResponse?.sttProvider,
-            sttModel: lastResponse?.sttModel,
-            sttProcessingMs: sum("sttProcessingMs"),
-            sttWordCount: sum("sttWordCount"),
-            sttLanguage: lastResponse?.sttLanguage,
-            audioDurationMs: sum("audioDurationMs"),
-          };
-        }
-
         const { body, boundary } = buildMultipartBody(
           audioData,
           "audio.webm",
           "audio/webm",
           multipartFields
         );
-        const url = new URL(`${apiUrl}/api/transcribe`);
+        const url = new URL(eggheadsAuth.buildTranscriptionUrl(apiUrl));
         const data = await postMultipart(url, body, boundary, authHeader);
 
         debugLogger.debug(
@@ -3776,16 +4133,8 @@ class IPCHandlers {
           success: true,
           text: result.text,
           clientTranscriptionId,
-          wordsUsed: result.wordsUsed,
-          wordsRemaining: result.wordsRemaining,
-          plan: result.plan,
-          limitReached: result.limitReached || false,
-          sttProvider: result.sttProvider,
-          sttModel: result.sttModel,
-          sttProcessingMs: result.sttProcessingMs,
-          sttWordCount: result.sttWordCount,
-          sttLanguage: result.sttLanguage,
-          audioDurationMs: result.audioDurationMs,
+          sttProvider: "eggheads",
+          sttModel: "server",
         };
       } catch (error) {
         debugLogger.error("Cloud transcription error", { error: error.message }, "cloud-api");
@@ -3829,125 +4178,37 @@ class IPCHandlers {
       const buffer = this.audioStorageManager.getAudioBuffer(id);
       if (!buffer) return { success: false, error: "Audio file not found" };
       try {
-        let result;
         const preferredLanguage = settings?.preferredLanguage;
         const language =
           preferredLanguage && preferredLanguage !== "auto"
             ? preferredLanguage.split("-")[0]
             : undefined;
-
-        if (settings?.useLocalWhisper) {
-          if (settings.localTranscriptionProvider === "nvidia") {
-            const model =
-              settings.parakeetModel || process.env.PARAKEET_MODEL || "parakeet-tdt-0.6b-v3";
-            result = await this.parakeetManager.transcribeLocalParakeet(buffer, { model });
-          } else if (this.whisperManager?.serverManager?.isAvailable?.()) {
-            const vadOptions = this._resolveWhisperVadOptions("noteRecording");
-            result = await this.whisperManager.transcribeLocalWhisper(buffer, {
-              model: settings.whisperModel,
-              language,
-              ...vadOptions,
-            });
-          }
-        } else if (settings?.cloudTranscriptionMode === "openwhispr") {
-          const win = BrowserWindow.fromWebContents(event.sender);
-          if (win) {
-            const authHeader = await getAuthHeaderFromWindow(win);
-            if (Object.keys(authHeader).length) {
-              const apiUrl = getApiUrl();
-              if (apiUrl) {
-                const multipartFields = {
-                  language,
-                  clientType: "desktop",
-                  appVersion: app.getVersion(),
-                  sessionId: this.sessionId,
-                };
-                if (buffer.length > CLOUD_INLINE_LIMIT) {
-                  const { text } = await chunkedCloudTranscribe({
-                    buffer,
-                    apiUrl,
-                    authHeader,
-                    multipartFields,
-                  });
-                  result = { text, source: "openwhispr", model: "cloud" };
-                } else {
-                  const { body, boundary } = buildMultipartBody(
-                    buffer,
-                    "audio.webm",
-                    "audio/webm",
-                    multipartFields
-                  );
-                  const url = new URL(`${apiUrl}/api/transcribe`);
-                  const data = await postMultipart(url, body, boundary, authHeader);
-                  const responseData = interpretTranscribeResponse(data);
-                  result = {
-                    text: responseData.text,
-                    source: "openwhispr",
-                    model: "cloud",
-                  };
-                }
-              }
-            }
-          }
-        } else {
-          const provider = settings?.cloudTranscriptionProvider || "openai";
-          const model = this._resolveByokModel(provider, settings?.cloudTranscriptionModel);
-
-          let apiKey, endpoint;
-          if (provider === "groq") {
-            apiKey = this.environmentManager.getGroqKey();
-            endpoint = "https://api.groq.com/openai/v1/audio/transcriptions";
-          } else if (provider === "xai") {
-            apiKey = this.environmentManager.getXaiKey();
-            endpoint = XAI_STT_URL;
-          } else if (provider === "mistral") {
-            apiKey = this.environmentManager.getMistralKey();
-            endpoint = MISTRAL_TRANSCRIPTION_URL;
-          } else if (provider === "custom") {
-            apiKey = this.environmentManager.getCustomTranscriptionKey();
-            const base = (settings?.cloudTranscriptionBaseUrl || "").trim();
-            endpoint = base
-              ? /\/audio\/(transcriptions|translations)$/i.test(base)
-                ? base
-                : `${base}/audio/transcriptions`
-              : "https://api.openai.com/v1/audio/transcriptions";
-          } else {
-            apiKey = this.environmentManager.getOpenAIKey();
-            endpoint = "https://api.openai.com/v1/audio/transcriptions";
-          }
-          if (!apiKey && provider !== "custom") {
-            throw new Error(`${provider} API key not configured`);
-          }
-
-          const formData = new FormData();
-          formData.append("file", new Blob([buffer], { type: "audio/webm" }), "audio.webm");
-          if (provider === "xai") {
-            // xAI STT does not accept a model field; language only when in supported set
-            if (language && XAI_STT_LANGUAGES.has(language)) {
-              formData.append("language", language);
-              formData.append("format", "true");
-            }
-          } else {
-            formData.append("model", model);
-            if (language) formData.append("language", language);
-          }
-          const headers = {};
-          if (provider === "mistral") {
-            headers["x-api-key"] = apiKey;
-          } else if (apiKey) {
-            headers.Authorization = `Bearer ${apiKey}`;
-          }
-
-          const response = await proxyFetch(endpoint, { method: "POST", headers, body: formData });
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`${provider} API Error: ${response.status} ${errorText}`);
-          }
-          const data = await response.json();
-          if (data?.text) {
-            result = { text: data.text, source: provider, model };
-          }
+        const authHeader = await getAuthHeader(event);
+        if (!Object.keys(authHeader).length) {
+          throw Object.assign(new Error("Not authenticated"), { code: "AUTH_REQUIRED" });
         }
+        const apiUrl = getApiUrl();
+        const multipartFields = {
+          language,
+          model: "whisper-1",
+          clientType: "desktop",
+          appVersion: app.getVersion(),
+          sessionId: this.sessionId,
+        };
+        const { body, boundary } = buildMultipartBody(
+          buffer,
+          "audio.webm",
+          "audio/webm",
+          multipartFields
+        );
+        const url = new URL(eggheadsAuth.buildTranscriptionUrl(apiUrl));
+        const data = await postMultipart(url, body, boundary, authHeader);
+        const responseData = interpretTranscribeResponse(data);
+        const result = {
+          text: responseData.text,
+          source: "eggheads",
+          model: "server",
+        };
 
         if (!result?.text) {
           return { success: false, error: "No transcription engine available" };
@@ -5454,6 +5715,8 @@ class IPCHandlers {
 
     // Pre-warm: fetch tokens + connect WebSockets before user hits record
     ipcMain.handle("meeting-transcription-prepare", async (event, options = {}) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Meeting transcription");
+
       if (meetingTranscriptionPrepareInProgress || meetingTranscriptionStartInProgress) {
         debugLogger.debug("Meeting transcription prepare already in progress, ignoring");
         return { success: false, error: "Operation in progress" };
@@ -5500,6 +5763,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("meeting-transcription-cancel", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Meeting transcription");
+
       if (isMeetingStreamingConnected() || meetingLocalTimer) {
         return { success: false, reason: "recording-active" };
       }
@@ -5510,6 +5775,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("meeting-transcription-start", async (event, options = {}) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Meeting transcription");
+
       // Wait for any in-flight prepare to finish before starting
       if (meetingTranscriptionPreparePromise) {
         debugLogger.debug("Meeting transcription start: waiting for in-flight prepare");
@@ -5784,10 +6051,13 @@ class IPCHandlers {
     };
 
     ipcMain.on("meeting-transcription-send", (_event, audioBuffer, source) => {
+      if (EGGHEADS_DICTATION_ONLY) return;
       sendMeetingAudio(audioBuffer, source);
     });
 
     ipcMain.handle("meeting-transcription-stop", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Meeting transcription");
+
       this.meetingDetectionEngine?.setUserRecording(false);
       try {
         if (this.audioTapManager) {
@@ -5882,6 +6152,8 @@ class IPCHandlers {
     };
 
     ipcMain.handle("dictation-realtime-warmup", async (event, options = {}) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictation realtime");
+
       try {
         await connectDictationStreaming(event, options);
         startDictationIdleTimer();
@@ -5892,6 +6164,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("dictation-realtime-start", async (event, options = {}) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictation realtime");
+
       try {
         clearDictationIdleTimer();
         this._dictationPreviewEnabled = !!options.preview;
@@ -5903,10 +6177,14 @@ class IPCHandlers {
     });
 
     ipcMain.on("dictation-realtime-send", (_event, buffer) => {
+      if (EGGHEADS_DICTATION_ONLY) return;
+
       this._dictationStreaming?.sendAudio(Buffer.from(buffer));
     });
 
     ipcMain.handle("dictation-realtime-stop", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictation realtime");
+
       clearDictationIdleTimer();
       if (!this._dictationStreaming) {
         return { success: true, text: "" };
@@ -5921,6 +6199,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("start-dictation-preview", async (_event, { provider, model, language }) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictation preview");
+
       resetDictationPreviewState();
       dictationPreviewMode = true;
       dictationPreviewSessionActive = true;
@@ -5934,6 +6214,8 @@ class IPCHandlers {
     });
 
     ipcMain.on("dictation-preview-audio", (_event, audioBuffer) => {
+      if (EGGHEADS_DICTATION_ONLY) return;
+
       if (!dictationPreviewMode) return;
       dictationPreviewChunkCount++;
       if (dictationPreviewChunkCount <= 3 || dictationPreviewChunkCount % 50 === 0) {
@@ -5949,12 +6231,16 @@ class IPCHandlers {
     });
 
     ipcMain.handle("dismiss-dictation-preview", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictation preview");
+
       resetDictationPreviewState();
       this.windowManager.hideTranscriptionPreview();
       return { success: true };
     });
 
     ipcMain.handle("complete-dictation-preview", async (_event, { text } = {}) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictation preview");
+
       if (!dictationPreviewSessionActive) {
         return { success: true };
       }
@@ -5968,12 +6254,16 @@ class IPCHandlers {
     });
 
     ipcMain.handle("hide-dictation-preview", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictation preview");
+
       resetDictationPreviewState();
       this.windowManager.hideTranscriptionPreview();
       return { success: true };
     });
 
     ipcMain.handle("resize-transcription-preview-window", async (_event, width, height) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictation preview");
+
       if (!dictationPreviewSessionActive) {
         return { success: false, error: "Preview session not active" };
       }
@@ -5981,6 +6271,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("stop-dictation-preview", async (_event, options = {}) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Dictation preview");
+
       if (!dictationPreviewMode && !dictationPreviewSessionActive) {
         return { success: true };
       }
@@ -6011,6 +6303,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("cloud-reason", async (event, text, opts = {}) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Cloud reasoning");
+
       try {
         const apiUrl = getApiUrl();
         if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
@@ -6098,6 +6392,8 @@ class IPCHandlers {
     });
 
     ipcMain.on("cloud-agent-stream-start", async (event, messages, opts = {}) => {
+      if (EGGHEADS_DICTATION_ONLY) return;
+
       try {
         const apiUrl = getApiUrl();
         if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
@@ -6176,6 +6472,7 @@ class IPCHandlers {
     });
 
     ipcMain.handle("agent-open-note", async (_event, noteId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Notes persistence");
       try {
         const note = this.databaseManager.getNote(noteId);
         await this.windowManager.createControlPanelWindow();
@@ -6191,6 +6488,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("agent-web-search", async (event, query, numResults = 5) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Agent web search");
+
       try {
         const apiUrl = getApiUrl();
         if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
@@ -6234,6 +6533,8 @@ class IPCHandlers {
     ipcMain.handle(
       "cloud-streaming-usage",
       async (event, text, audioDurationSeconds, opts = {}) => {
+        if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Cloud streaming usage");
+
         try {
           const apiUrl = getApiUrl();
           if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
@@ -6285,6 +6586,8 @@ class IPCHandlers {
     );
 
     ipcMain.handle("cloud-usage", async (event) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Cloud usage");
+
       try {
         const apiUrl = getApiUrl();
         if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
@@ -6315,6 +6618,10 @@ class IPCHandlers {
     });
 
     const fetchStripeUrl = async (event, endpoint, errorPrefix, body) => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return { success: false, error: "Billing is disabled in EGGHEADS Dictation" };
+      }
+
       try {
         const apiUrl = getApiUrl();
         if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
@@ -6350,15 +6657,24 @@ class IPCHandlers {
       }
     };
 
-    ipcMain.handle("cloud-checkout", (event, opts) =>
-      fetchStripeUrl(event, "/api/stripe/checkout", "Cloud checkout error", opts || undefined)
-    );
+    ipcMain.handle("cloud-checkout", (event, opts) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Billing");
+      return fetchStripeUrl(
+        event,
+        "/api/stripe/checkout",
+        "Cloud checkout error",
+        opts || undefined
+      );
+    });
 
-    ipcMain.handle("cloud-billing-portal", (event) =>
-      fetchStripeUrl(event, "/api/stripe/portal", "Cloud billing portal error")
-    );
+    ipcMain.handle("cloud-billing-portal", (event) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Billing");
+      return fetchStripeUrl(event, "/api/stripe/portal", "Cloud billing portal error");
+    });
 
     ipcMain.handle("cloud-switch-plan", async (event, opts) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Billing");
+
       try {
         const apiUrl = getApiUrl();
         if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
@@ -6391,6 +6707,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("cloud-preview-switch", async (event, opts) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Billing");
+
       try {
         const apiUrl = getApiUrl();
         if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
@@ -6423,6 +6741,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("cloud-api-request", async (event, opts) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Cloud API bridge");
+
       try {
         const apiUrl = getApiUrl();
         if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
@@ -6485,6 +6805,13 @@ class IPCHandlers {
     });
 
     ipcMain.handle("get-stt-config", async (event) => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return {
+          success: true,
+          dictation: { mode: "batch", provider: "eggheads", model: "server" },
+        };
+      }
+
       try {
         const apiUrl = getApiUrl();
         if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
@@ -6515,6 +6842,14 @@ class IPCHandlers {
     });
 
     ipcMain.handle("get-note-recording-config", async (event) => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return {
+          success: true,
+          enabled: false,
+          recording: { mode: "disabled" },
+        };
+      }
+
       try {
         const apiUrl = getApiUrl();
         if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
@@ -6542,37 +6877,23 @@ class IPCHandlers {
     });
 
     ipcMain.handle("transcribe-audio-file-cloud", async (event, filePath) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Audio file transcription");
+
       try {
         const apiUrl = getApiUrl();
-        if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
+        if (!apiUrl) throw new Error("EGGHEADS API URL not configured");
 
         const authHeader = await getAuthHeader(event);
         if (!Object.keys(authHeader).length) throw new Error("Not authenticated");
 
         const multipartFields = {
+          model: "whisper-1",
           source: "file_upload",
           clientType: "desktop",
           appVersion: app.getVersion(),
           clientVersion: app.getVersion(),
           sessionId: this.sessionId,
         };
-
-        const fileSize = fs.statSync(filePath).size;
-
-        if (fileSize > CLOUD_INLINE_LIMIT) {
-          debugLogger.debug("Large file detected, using client-side chunking", {
-            fileSize,
-            filePath: path.basename(filePath),
-          });
-          const { text, warning } = await chunkedCloudTranscribe({
-            filePath,
-            apiUrl,
-            authHeader,
-            multipartFields,
-            onProgress: (payload) => event.sender.send("upload-transcription-progress", payload),
-          });
-          return { success: true, text, ...(warning ? { warning } : {}) };
-        }
 
         const audioBuffer = fs.readFileSync(filePath);
         const ext = path.extname(filePath).toLowerCase().replace(".", "");
@@ -6585,7 +6906,7 @@ class IPCHandlers {
           contentType,
           multipartFields
         );
-        const url = new URL(`${apiUrl}/api/transcribe`);
+        const url = new URL(eggheadsAuth.buildTranscriptionUrl(apiUrl));
         const data = await postMultipart(url, body, boundary, authHeader);
         const result = interpretTranscribeResponse(data);
 
@@ -6605,6 +6926,8 @@ class IPCHandlers {
         event,
         { filePath, apiKey, baseUrl, model, provider, language, environment, tenant }
       ) => {
+        if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("BYOK audio file transcription");
+
         const fs = require("fs");
         const BYOK_FILE_SIZE_LIMIT = 25 * 1024 * 1024; // 25 MB
         try {
@@ -6694,6 +7017,8 @@ class IPCHandlers {
     );
 
     ipcMain.handle("get-referral-stats", async (event) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Referrals");
+
       try {
         const apiUrl = getApiUrl();
         if (!apiUrl) {
@@ -6730,6 +7055,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("send-referral-invite", async (event, email) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Referrals");
+
       try {
         const apiUrl = getApiUrl();
         if (!apiUrl) {
@@ -6768,6 +7095,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("get-referral-invites", async (event) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Referrals");
+
       try {
         const apiUrl = getApiUrl();
         if (!apiUrl) {
@@ -6804,6 +7133,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("open-whisper-models-folder", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Local model cache");
+
       try {
         const { getCacheRoot } = require("./modelDirUtils");
         const cacheRoot = getCacheRoot();
@@ -6997,6 +7328,8 @@ class IPCHandlers {
     };
 
     ipcMain.handle("assemblyai-streaming-warmup", async (event, options = {}) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("AssemblyAI realtime");
+
       try {
         const apiUrl = getApiUrl();
         if (!apiUrl) {
@@ -7034,6 +7367,8 @@ class IPCHandlers {
     let streamingStartInProgress = false;
 
     ipcMain.handle("assemblyai-streaming-start", async (event, options = {}) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("AssemblyAI realtime");
+
       if (streamingStartInProgress) {
         debugLogger.debug("Streaming start already in progress, ignoring", {}, "streaming");
         return { success: false, error: "Operation in progress" };
@@ -7122,6 +7457,8 @@ class IPCHandlers {
     });
 
     ipcMain.on("assemblyai-streaming-send", (event, audioBuffer) => {
+      if (EGGHEADS_DICTATION_ONLY) return;
+
       try {
         if (!this.assemblyAiStreaming) return;
         const buffer = Buffer.from(audioBuffer);
@@ -7132,10 +7469,14 @@ class IPCHandlers {
     });
 
     ipcMain.on("assemblyai-streaming-force-endpoint", () => {
+      if (EGGHEADS_DICTATION_ONLY) return;
+
       this.assemblyAiStreaming?.forceEndpoint();
     });
 
     ipcMain.handle("assemblyai-streaming-stop", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("AssemblyAI realtime");
+
       try {
         let result = { text: "" };
         if (this.assemblyAiStreaming) {
@@ -7152,6 +7493,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("assemblyai-streaming-status", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyUnavailable("AssemblyAI realtime");
+
       if (!this.assemblyAiStreaming) {
         return { isConnected: false, sessionId: null };
       }
@@ -7228,6 +7571,8 @@ class IPCHandlers {
     };
 
     ipcMain.handle("deepgram-streaming-warmup", async (event, options = {}) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Deepgram realtime");
+
       try {
         const apiUrl = getApiUrl();
         if (!apiUrl) {
@@ -7276,6 +7621,8 @@ class IPCHandlers {
     let sendDropCount = 0;
 
     ipcMain.handle("deepgram-streaming-start", async (event, options = {}) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Deepgram realtime");
+
       if (deepgramStreamingStartInProgress) {
         debugLogger.debug(
           "Deepgram streaming start already in progress, ignoring",
@@ -7376,6 +7723,8 @@ class IPCHandlers {
     });
 
     ipcMain.on("deepgram-streaming-send", (event, audioBuffer) => {
+      if (EGGHEADS_DICTATION_ONLY) return;
+
       try {
         if (!this.deepgramStreaming) return;
         const buffer = Buffer.from(audioBuffer);
@@ -7412,10 +7761,14 @@ class IPCHandlers {
     });
 
     ipcMain.on("deepgram-streaming-finalize", () => {
+      if (EGGHEADS_DICTATION_ONLY) return;
+
       this.deepgramStreaming?.finalize();
     });
 
     ipcMain.handle("deepgram-streaming-stop", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Deepgram realtime");
+
       try {
         const model = this.deepgramStreaming?.currentModel || "nova-3";
         const audioBytesSent = this.deepgramStreaming?.audioBytesSent || 0;
@@ -7432,6 +7785,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("deepgram-streaming-status", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyUnavailable("Deepgram realtime");
+
       if (!this.deepgramStreaming) {
         return { isConnected: false, sessionId: null };
       }
@@ -7439,6 +7794,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("corti-streaming-warmup", async (_event, options = {}) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Corti realtime");
+
       try {
         if (!this.cortiStreaming) {
           this.cortiStreaming = new CortiStreaming();
@@ -7461,6 +7818,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("corti-streaming-start", async (event, options = {}) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Corti realtime");
+
       try {
         if (!this.cortiStreaming) {
           this.cortiStreaming = new CortiStreaming();
@@ -7500,14 +7859,20 @@ class IPCHandlers {
     });
 
     ipcMain.on("corti-streaming-send", (_event, audioBuffer) => {
+      if (EGGHEADS_DICTATION_ONLY) return;
+
       this.cortiStreaming?.sendAudio(Buffer.from(audioBuffer));
     });
 
     ipcMain.on("corti-streaming-finalize", () => {
+      if (EGGHEADS_DICTATION_ONLY) return;
+
       this.cortiStreaming?.finalize();
     });
 
     ipcMain.handle("corti-streaming-stop", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Corti realtime");
+
       try {
         const model = this.cortiStreaming?.currentModel || "corti-transcribe";
         const audioBytesSent = this.cortiStreaming?.audioBytesSent || 0;
@@ -7523,6 +7888,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("corti-streaming-status", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyUnavailable("Corti realtime");
+
       if (!this.cortiStreaming) {
         return { isConnected: false, sessionId: null };
       }
@@ -7531,6 +7898,12 @@ class IPCHandlers {
 
     // Agent mode handlers
     ipcMain.handle("update-agent-hotkey", async (_event, hotkey) => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        this.windowManager.hotkeyManager?.unregisterSlot?.("agent");
+        this.environmentManager.saveAgentKey?.("");
+        return dictationOnlyDisabled("Chat Agent hotkey");
+      }
+
       const hotkeyManager = this.windowManager.hotkeyManager;
       const agentCallback = this.windowManager._agentHotkeyCallback;
       if (!agentCallback) {
@@ -7558,6 +7931,12 @@ class IPCHandlers {
     });
 
     ipcMain.handle("update-voice-agent-hotkey", async (_event, hotkey) => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        this.windowManager.hotkeyManager?.unregisterSlot?.("voiceAgent");
+        this.environmentManager.saveVoiceAgentKey?.("");
+        return dictationOnlyDisabled("Voice Agent hotkey");
+      }
+
       const hotkeyManager = this.windowManager.hotkeyManager;
       const voiceAgentCallback = this.windowManager._voiceAgentHotkeyCallback;
       if (!voiceAgentCallback) {
@@ -7585,37 +7964,48 @@ class IPCHandlers {
     });
 
     ipcMain.handle("get-voice-agent-key", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
       return this.environmentManager.getVoiceAgentKey?.() || "";
     });
 
     ipcMain.handle("get-agent-key", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return "";
       return this.environmentManager.getAgentKey?.() || "";
     });
 
     ipcMain.handle("save-agent-key", async (_event, key) => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        this.environmentManager.saveAgentKey?.("");
+        return dictationOnlyDisabled("Chat Agent hotkey");
+      }
       return this.environmentManager.saveAgentKey?.(key) || { success: true };
     });
 
     ipcMain.handle("toggle-agent-overlay", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Chat Agent overlay");
       this.windowManager.toggleAgentOverlay();
       return { success: true };
     });
 
     ipcMain.handle("hide-agent-overlay", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Chat Agent overlay");
       this.windowManager.hideAgentOverlay();
       return { success: true };
     });
 
     ipcMain.handle("resize-agent-window", async (_event, width, height) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Chat Agent overlay");
       this.windowManager.resizeAgentWindow(width, height);
       return { success: true };
     });
 
     ipcMain.handle("get-agent-window-bounds", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return null;
       return this.windowManager.getAgentWindowBounds();
     });
 
     ipcMain.handle("set-agent-window-bounds", async (_event, x, y, width, height) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Chat Agent overlay");
       this.windowManager.setAgentWindowBounds(x, y, width, height);
       return { success: true };
     });
@@ -7637,6 +8027,8 @@ class IPCHandlers {
 
     // Google Calendar
     ipcMain.handle("gcal-start-oauth", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Google Calendar");
+
       try {
         return await this.googleCalendarManager.startOAuth();
       } catch (error) {
@@ -7646,6 +8038,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("gcal-disconnect", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Google Calendar");
+
       try {
         this.googleCalendarManager.disconnect();
         return { success: true };
@@ -7660,6 +8054,10 @@ class IPCHandlers {
     });
 
     ipcMain.handle("gcal-get-connection-status", async () => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return { connected: false, email: null, code: DICTATION_ONLY_DISABLED_CODE };
+      }
+
       try {
         return this.googleCalendarManager.getConnectionStatus();
       } catch (error) {
@@ -7668,6 +8066,10 @@ class IPCHandlers {
     });
 
     ipcMain.handle("gcal-get-calendars", async () => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return { success: false, calendars: [], code: DICTATION_ONLY_DISABLED_CODE };
+      }
+
       try {
         return { success: true, calendars: this.googleCalendarManager.getCalendars() };
       } catch (error) {
@@ -7676,6 +8078,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("gcal-set-calendar-selection", async (_event, calendarId, isSelected) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Google Calendar");
+
       try {
         await this.googleCalendarManager.setCalendarSelection(calendarId, isSelected);
         return { success: true };
@@ -7685,6 +8089,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("gcal-set-primary-only", async (_event, value) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Google Calendar");
+
       try {
         await this.googleCalendarManager.setPrimaryOnly(value);
         return { success: true };
@@ -7694,6 +8100,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("gcal-sync-events", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Google Calendar");
+
       try {
         await this.googleCalendarManager.syncEvents();
         return { success: true };
@@ -7703,6 +8111,10 @@ class IPCHandlers {
     });
 
     ipcMain.handle("gcal-get-upcoming-events", async (_event, windowMinutes) => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return { success: false, events: [], code: DICTATION_ONLY_DISABLED_CODE };
+      }
+
       try {
         return {
           success: true,
@@ -7714,6 +8126,10 @@ class IPCHandlers {
     });
 
     ipcMain.handle("gcal-get-event", async (_event, eventId) => {
+      if (EGGHEADS_DICTATION_ONLY) {
+        return { success: false, event: null, code: DICTATION_ONLY_DISABLED_CODE };
+      }
+
       try {
         const event = this.databaseManager.getCalendarEventById(eventId);
         return { success: true, event };
@@ -7745,6 +8161,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("meeting-detection-get-preferences", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Meeting detection");
+
       try {
         return { success: true, preferences: this.meetingDetectionEngine.getPreferences() };
       } catch (error) {
@@ -7753,6 +8171,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("meeting-detection-set-preferences", async (_event, prefs) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Meeting detection");
+
       try {
         this.meetingDetectionEngine.setPreferences(prefs);
         return { success: true };
@@ -7791,6 +8211,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("meeting-set-speaker-diarization-enabled", async (_event, payload) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Meeting diarization");
+
       try {
         this.speakerDiarizationEnabled = payload?.enabled !== false;
         return { success: true };
@@ -7800,6 +8222,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("whisper-vad-get-config", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Whisper VAD");
+
       try {
         return { success: true, config: this._getWhisperVadSettings() };
       } catch (error) {
@@ -7808,6 +8232,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("whisper-vad-set-config", async (_event, payload) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Whisper VAD");
+
       try {
         const config = this._setWhisperVadSettings(payload || {});
         return { success: true, config };
@@ -7817,6 +8243,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("meeting-set-session-speaker-config", async (_event, payload) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Meeting speaker config");
+
       try {
         const enabled = payload?.enabled !== false;
         const expectedCount = Math.max(
@@ -7838,6 +8266,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("meeting-notification-respond", async (_event, detectionId, action) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Meeting notifications");
+
       try {
         await this.meetingDetectionEngine.handleNotificationResponse(detectionId, action);
         return { success: true };
@@ -7847,6 +8277,8 @@ class IPCHandlers {
     });
 
     ipcMain.handle("join-calendar-meeting", async (_event, eventId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Meeting join");
+
       try {
         await this.meetingDetectionEngine.joinCalendarMeeting(eventId);
         return { success: true };
@@ -7856,14 +8288,17 @@ class IPCHandlers {
     });
 
     ipcMain.handle("get-meeting-notification-data", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return null;
       return this.windowManager?._pendingNotificationData ?? null;
     });
 
     ipcMain.handle("get-pending-meeting-note-navigation", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return null;
       return this.windowManager?.consumePendingMeetingNoteNavigation() ?? null;
     });
 
     ipcMain.handle("meeting-notification-ready", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Meeting notifications");
       this.windowManager?.showNotificationWindow();
     });
 
@@ -7889,6 +8324,7 @@ class IPCHandlers {
 
     // Note files (markdown mirror) handlers
     ipcMain.handle("note-files-set-enabled", async (_event, enabled, customPath, options) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Note files");
       try {
         this._noteFilesEnabled = !!enabled;
         if (!enabled) return { success: true };
@@ -7910,6 +8346,7 @@ class IPCHandlers {
     });
 
     ipcMain.handle("note-files-set-path", async (_event, newPath) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Note files");
       try {
         if (!this._noteFilesEnabled) return { success: false, error: "Note files not enabled" };
         this._rebuildMirror(newPath);
@@ -7921,6 +8358,7 @@ class IPCHandlers {
     });
 
     ipcMain.handle("note-files-rebuild", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Note files");
       try {
         if (!this._noteFilesEnabled) return { success: false, error: "Note files not enabled" };
         this._rebuildMirror();
@@ -7932,10 +8370,12 @@ class IPCHandlers {
     });
 
     ipcMain.handle("note-files-get-default-path", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Note files");
       return path.join(app.getPath("userData"), "notes");
     });
 
     ipcMain.handle("show-note-file", async (_event, noteId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Note files");
       try {
         const markdownMirror = require("./markdownMirror");
         const filePath = markdownMirror.getNotePath(noteId);
@@ -7953,6 +8393,7 @@ class IPCHandlers {
     });
 
     ipcMain.handle("show-folder-in-explorer", async (_event, folderName) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Note files");
       try {
         const markdownMirror = require("./markdownMirror");
         const dirPath = markdownMirror.getFolderPath(folderName);
@@ -7970,6 +8411,7 @@ class IPCHandlers {
     });
 
     ipcMain.handle("note-files-pick-folder", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Note files");
       try {
         const { dialog } = require("electron");
         const result = await dialog.showOpenDialog({ properties: ["openDirectory"] });
@@ -7984,12 +8426,14 @@ class IPCHandlers {
     });
 
     ipcMain.handle("get-speaker-mappings", async (_event, noteId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Speaker note persistence");
       return this.databaseManager.getSpeakerMappings(noteId);
     });
 
     ipcMain.handle(
       "set-speaker-mapping",
       async (_event, noteId, speakerId, displayName, email, profileId) => {
+        if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Speaker note persistence");
         const embeddings = this.databaseManager.getNoteSpeakerEmbeddings(noteId);
         const noteSpeakerEmbedding = embeddings.find((e) => e.speaker_id === speakerId);
         const liveSpeakerEmbedding = liveSpeakerIdentifier.getSpeakerEmbedding(speakerId);
@@ -8016,15 +8460,18 @@ class IPCHandlers {
     );
 
     ipcMain.handle("remove-speaker-mapping", async (_event, noteId, speakerId) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Speaker note persistence");
       this.databaseManager.removeSpeakerMapping(noteId, speakerId);
       return { success: true };
     });
 
     ipcMain.handle("get-speaker-profiles", async () => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Speaker note persistence");
       return this.databaseManager.getSpeakerProfiles();
     });
 
     ipcMain.handle("attach-speaker-email", async (_event, profileId, email) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Speaker note persistence");
       try {
         const profile = this.databaseManager.attachEmailToProfile(profileId, email);
         this._retroactiveMapping(profile);
@@ -8048,6 +8495,7 @@ class IPCHandlers {
     });
 
     ipcMain.handle("save-note-speaker-embeddings", async (_event, noteId, embeddingsObj) => {
+      if (EGGHEADS_DICTATION_ONLY) return dictationOnlyDisabled("Speaker note persistence");
       const buffers = {};
       for (const [speakerId, arr] of Object.entries(embeddingsObj)) {
         buffers[speakerId] = Buffer.from(new Float32Array(arr).buffer);

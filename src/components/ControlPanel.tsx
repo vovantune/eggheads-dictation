@@ -48,7 +48,7 @@ import {
   consumePendingInvitationToken,
   clearPendingInvitationToken,
 } from "../utils/pendingInvitationToken";
-import { WORKSPACES_ENABLED } from "../lib/features";
+import { EGGHEADS_DICTATION_ONLY, WORKSPACES_ENABLED } from "../lib/features";
 
 const platform = getCachedPlatform();
 
@@ -121,6 +121,12 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
   const { isSignedIn, isLoaded: authLoaded, user } = useAuth();
   const usage = useUsage();
 
+  useEffect(() => {
+    if (EGGHEADS_DICTATION_ONLY && activeView !== "home") {
+      setActiveView("home");
+    }
+  }, [activeView]);
+
   const {
     status: updateStatus,
     downloadProgress,
@@ -162,6 +168,7 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
   }, [loadTranscriptions]);
 
   useEffect(() => {
+    if (EGGHEADS_DICTATION_ONLY) return;
     const { noteFilesEnabled, noteFilesPath } = useSettingsStore.getState();
     if (!noteFilesEnabled) return;
     window.electronAPI?.noteFilesSetEnabled?.(true, noteFilesPath || undefined, {
@@ -170,6 +177,7 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
   }, []);
 
   useEffect(() => {
+    if (EGGHEADS_DICTATION_ONLY) return;
     if (platform !== "darwin") return;
     window.electronAPI?.getPostMigrationState?.().then((state) => {
       if (state?.justMigrated) setShowPostMigration(true);
@@ -260,6 +268,7 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
   }, [usage?.isPastDue, usage?.hasLoaded, toast, t]);
 
   useEffect(() => {
+    if (EGGHEADS_DICTATION_ONLY) return;
     if (!WORKSPACES_ENABLED) return;
     const unsubscribe = window.electronAPI?.onWorkspaceInvitationToken?.((token) => {
       setInvitationToken(token);
@@ -268,6 +277,7 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
   }, []);
 
   useEffect(() => {
+    if (EGGHEADS_DICTATION_ONLY) return;
     if (!WORKSPACES_ENABLED || !authLoaded || !isSignedIn) return;
     const pending = consumePendingInvitationToken();
     if (pending) {
@@ -277,6 +287,7 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
   }, [authLoaded, isSignedIn]);
 
   useEffect(() => {
+    if (EGGHEADS_DICTATION_ONLY) return;
     if (!authLoaded || !isSignedIn || cloudMigrationProcessed.current) return;
     const isPending = localStorage.getItem("pendingCloudMigration") === "true";
     const alreadyShown = localStorage.getItem("cloudMigrationShown") === "true";
@@ -290,6 +301,7 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
   }, [authLoaded, isSignedIn, setUseLocalWhisper, setCloudTranscriptionMode]);
 
   useEffect(() => {
+    if (EGGHEADS_DICTATION_ONLY) return;
     if (platform === "darwin" || gpuBannerDismissed) return;
     const detect = async () => {
       const results = { cuda: false, vulkan: false };
@@ -314,6 +326,7 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
   }, [useLocalWhisper, localTranscriptionProvider, useCleanupModel, gpuBannerDismissed]);
 
   useEffect(() => {
+    if (EGGHEADS_DICTATION_ONLY) return;
     const drain = async () => {
       const data = await window.electronAPI?.getPendingMeetingNoteNavigation?.();
       if (!data) return;
@@ -339,6 +352,7 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
   }, []);
 
   useEffect(() => {
+    if (EGGHEADS_DICTATION_ONLY) return;
     const cleanup = window.electronAPI?.onNavigateToNote?.((data) => {
       if (data.folderId) {
         setActiveFolderId(data.folderId);
@@ -375,6 +389,7 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
   }, [toast, t]);
 
   useEffect(() => {
+    if (EGGHEADS_DICTATION_ONLY) return;
     fetchStreamingProviders();
   }, []);
 
@@ -418,7 +433,9 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
             const result = await window.electronAPI.deleteTranscription(id);
             if (result.success) {
               removeFromStore(id);
-              syncService.requestSyncAll("manual");
+              if (!EGGHEADS_DICTATION_ONLY) {
+                syncService.requestSyncAll("manual");
+              }
             } else {
               showAlertDialog({
                 title: t("controlPanel.history.couldNotDeleteTitle"),
@@ -447,7 +464,9 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
           const result = await window.electronAPI.clearTranscriptions();
           if (result.success) {
             clearStore();
-            syncService.requestSyncAll("manual");
+            if (!EGGHEADS_DICTATION_ONLY) {
+              syncService.requestSyncAll("manual");
+            }
             toast({
               title: t("controlPanel.history.clearAllSuccess"),
               variant: "success",
@@ -642,16 +661,18 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
 
   return (
     <div className="h-screen bg-background flex flex-col">
-      <MeetingRecordingMount />
-      <MeetingRecordingPill
-        activeView={activeView}
-        activeNoteId={activeNoteId}
-        onReturnToNote={() => {
-          setActiveView("personal-notes");
-          setActiveFolderId(recordingFolderId);
-          setActiveNoteId(recordingNoteId);
-        }}
-      />
+      {!EGGHEADS_DICTATION_ONLY && <MeetingRecordingMount />}
+      {!EGGHEADS_DICTATION_ONLY && (
+        <MeetingRecordingPill
+          activeView={activeView}
+          activeNoteId={activeNoteId}
+          onReturnToNote={() => {
+            setActiveView("personal-notes");
+            setActiveFolderId(recordingFolderId);
+            setActiveNoteId(recordingNoteId);
+          }}
+        />
+      )}
       <ConfirmDialog
         open={confirmDialog.open}
         onOpenChange={hideConfirmDialog}
@@ -669,18 +690,18 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
         onOk={() => {}}
       />
 
-      <UpgradePrompt
+      {!EGGHEADS_DICTATION_ONLY && <UpgradePrompt
         open={showUpgradePrompt}
         onOpenChange={setShowUpgradePrompt}
         wordsUsed={limitData?.wordsUsed}
         limit={limitData?.limit}
-      />
+      />}
 
-      <PostMigrationOnboarding
+      {!EGGHEADS_DICTATION_ONLY && <PostMigrationOnboarding
         open={showPostMigration}
         onOpenChange={setShowPostMigration}
         onDone={dismissPostMigrationPermanently}
-      />
+      />}
 
       {showSettings && (
         <Suspense fallback={null}>
@@ -695,13 +716,13 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
         </Suspense>
       )}
 
-      {showReferrals && (
+      {!EGGHEADS_DICTATION_ONLY && showReferrals && (
         <Suspense fallback={null}>
           <ReferralModal open={showReferrals} onOpenChange={setShowReferrals} />
         </Suspense>
       )}
 
-      {WORKSPACES_ENABLED && (
+      {!EGGHEADS_DICTATION_ONLY && WORKSPACES_ENABLED && (
         <AcceptInvitationModal
           token={invitationToken}
           onClose={() => setInvitationToken(null)}
@@ -712,7 +733,7 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
         />
       )}
 
-      {showSearch && (
+      {!EGGHEADS_DICTATION_ONLY && showSearch && (
         <Suspense fallback={null}>
           <CommandSearch
             open={showSearch}
@@ -904,12 +925,12 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
                 }}
               />
             )}
-            {activeView === "chat" && (
+            {!EGGHEADS_DICTATION_ONLY && activeView === "chat" && (
               <Suspense fallback={null}>
                 <ChatView />
               </Suspense>
             )}
-            {activeView === "personal-notes" && (
+            {!EGGHEADS_DICTATION_ONLY && activeView === "personal-notes" && (
               <Suspense fallback={null}>
                 <PersonalNotesView
                   onOpenSettings={(section) => {
@@ -922,12 +943,12 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
                 />
               </Suspense>
             )}
-            {activeView === "dictionary" && (
+            {!EGGHEADS_DICTATION_ONLY && activeView === "dictionary" && (
               <Suspense fallback={null}>
                 <DictionaryView />
               </Suspense>
             )}
-            {activeView === "upload" && (
+            {!EGGHEADS_DICTATION_ONLY && activeView === "upload" && (
               <Suspense fallback={null}>
                 <UploadAudioView
                   onNoteCreated={(noteId, folderId) => {
@@ -942,7 +963,7 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
                 />
               </Suspense>
             )}
-            {activeView === "integrations" && (
+            {!EGGHEADS_DICTATION_ONLY && activeView === "integrations" && (
               <Suspense fallback={null}>
                 <IntegrationsView
                   isPaid={!!(usage?.isSubscribed || usage?.isTrial)}
@@ -956,7 +977,7 @@ export default function ControlPanel({ initialSettingsSection }: ControlPanelPro
           </div>
         </main>
       </div>
-      <BackgroundActionToastListener />
+      {!EGGHEADS_DICTATION_ONLY && <BackgroundActionToastListener />}
     </div>
   );
 }

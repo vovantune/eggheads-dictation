@@ -1133,9 +1133,33 @@ declare global {
       setAutoStartEnabled?: (enabled: boolean) => Promise<{ success: boolean; error?: string }>;
 
       // Auth
+      authStart?: () => Promise<{ success: boolean; url?: string; error?: string }>;
+      authGetSession?: () => Promise<{
+        signedIn: boolean;
+        user: {
+          id: string;
+          email?: string | null;
+          name?: string | null;
+          image?: string | null;
+          login?: string | null;
+          display_name?: string | null;
+        } | null;
+      }>;
       authClearSession?: () => Promise<void>;
       authGetToken?: () => Promise<string | null>;
       authSetToken?: (token: string) => Promise<void>;
+      onAuthSessionChanged?: (
+        callback: (
+          user: {
+            id: string;
+            email?: string | null;
+            name?: string | null;
+            image?: string | null;
+            login?: string | null;
+            display_name?: string | null;
+          } | null
+        ) => void
+      ) => () => void;
 
       // OpenWhispr Cloud API
       cloudTranscribe?: (

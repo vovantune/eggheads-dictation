@@ -101,7 +101,7 @@ import { formatBytes } from "../utils/formatBytes";
 import { useSettingsStore } from "../stores/settingsStore";
 import { canManageSystemAudioInApp } from "../utils/systemAudioAccess";
 import WorkspaceSection from "./settings/WorkspaceSection";
-import { WORKSPACES_ENABLED } from "../lib/features";
+import { EGGHEADS_DICTATION_ONLY, WORKSPACES_ENABLED } from "../lib/features";
 
 const formatAmount = (cents: number, currency: string) =>
   (cents / 100).toLocaleString(undefined, { style: "currency", currency });
@@ -1545,16 +1545,18 @@ export default function SettingsPage({
                   title={t("settingsPage.account.title")}
                   description={t("settingsPage.account.notConfigured")}
                 />
-                <SettingsPanel>
-                  <SettingsPanelRow>
-                    <SettingsRow
-                      label={t("settingsPage.account.featuresDisabled")}
-                      description={t("settingsPage.account.featuresDisabledDescription")}
-                    >
-                      <Badge variant="warning">{t("settingsPage.account.disabled")}</Badge>
-                    </SettingsRow>
-                  </SettingsPanelRow>
-                </SettingsPanel>
+                {!EGGHEADS_DICTATION_ONLY && (
+                  <SettingsPanel>
+                    <SettingsPanelRow>
+                      <SettingsRow
+                        label={t("settingsPage.account.featuresDisabled")}
+                        description={t("settingsPage.account.featuresDisabledDescription")}
+                      >
+                        <Badge variant="warning">{t("settingsPage.account.disabled")}</Badge>
+                      </SettingsRow>
+                    </SettingsPanelRow>
+                  </SettingsPanel>
+                )}
               </>
             ) : isLoaded && isSignedIn && user ? (
               <>
@@ -1601,27 +1603,29 @@ export default function SettingsPage({
                   </SettingsPanelRow>
                 </SettingsPanel>
 
-                <SettingsPanel>
-                  <SettingsPanelRow>
-                    <SettingsRow
-                      label={t("settingsPage.account.deleteAccount.label")}
-                      description={t("settingsPage.account.deleteAccount.labelDescription")}
-                    >
-                      <Button
-                        onClick={handleDeleteAccount}
-                        variant="outline"
-                        disabled={isDeletingAccount}
-                        size="sm"
-                        className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:border-destructive"
+                {!EGGHEADS_DICTATION_ONLY && (
+                  <SettingsPanel>
+                    <SettingsPanelRow>
+                      <SettingsRow
+                        label={t("settingsPage.account.deleteAccount.label")}
+                        description={t("settingsPage.account.deleteAccount.labelDescription")}
                       >
-                        <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                        {isDeletingAccount
-                          ? t("settingsPage.account.deleteAccount.deleting")
-                          : t("settingsPage.account.deleteAccount.button")}
-                      </Button>
-                    </SettingsRow>
-                  </SettingsPanelRow>
-                </SettingsPanel>
+                        <Button
+                          onClick={handleDeleteAccount}
+                          variant="outline"
+                          disabled={isDeletingAccount}
+                          size="sm"
+                          className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:border-destructive"
+                        >
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                          {isDeletingAccount
+                            ? t("settingsPage.account.deleteAccount.deleting")
+                            : t("settingsPage.account.deleteAccount.button")}
+                        </Button>
+                      </SettingsRow>
+                    </SettingsPanelRow>
+                  </SettingsPanel>
+                )}
               </>
             ) : isLoaded ? (
               <>
@@ -2443,34 +2447,38 @@ export default function SettingsPage({
                     />
                   </SettingsRow>
                 </SettingsPanelRow>
-                <SettingsPanelRow>
-                  <SettingsRow
-                    label={t("settingsPage.general.notifications.meetingDetection")}
-                    description={t(
-                      "settingsPage.general.notifications.meetingDetectionDescription"
-                    )}
-                  >
-                    <Toggle
-                      checked={notifyMeetingDetection}
-                      onChange={setNotifyMeetingDetection}
-                      disabled={!notificationsEnabled}
-                    />
-                  </SettingsRow>
-                </SettingsPanelRow>
-                <SettingsPanelRow>
-                  <SettingsRow
-                    label={t("settingsPage.general.notifications.calendarReminders")}
-                    description={t(
-                      "settingsPage.general.notifications.calendarRemindersDescription"
-                    )}
-                  >
-                    <Toggle
-                      checked={notifyCalendarReminders}
-                      onChange={setNotifyCalendarReminders}
-                      disabled={!notificationsEnabled}
-                    />
-                  </SettingsRow>
-                </SettingsPanelRow>
+                {!EGGHEADS_DICTATION_ONLY && (
+                  <SettingsPanelRow>
+                    <SettingsRow
+                      label={t("settingsPage.general.notifications.meetingDetection")}
+                      description={t(
+                        "settingsPage.general.notifications.meetingDetectionDescription"
+                      )}
+                    >
+                      <Toggle
+                        checked={notifyMeetingDetection}
+                        onChange={setNotifyMeetingDetection}
+                        disabled={!notificationsEnabled}
+                      />
+                    </SettingsRow>
+                  </SettingsPanelRow>
+                )}
+                {!EGGHEADS_DICTATION_ONLY && (
+                  <SettingsPanelRow>
+                    <SettingsRow
+                      label={t("settingsPage.general.notifications.calendarReminders")}
+                      description={t(
+                        "settingsPage.general.notifications.calendarRemindersDescription"
+                      )}
+                    >
+                      <Toggle
+                        checked={notifyCalendarReminders}
+                        onChange={setNotifyCalendarReminders}
+                        disabled={!notificationsEnabled}
+                      />
+                    </SettingsRow>
+                  </SettingsPanelRow>
+                )}
                 <SettingsPanelRow>
                   <SettingsRow
                     label={t("settingsPage.general.notifications.updates")}
@@ -2513,58 +2521,60 @@ export default function SettingsPage({
             </div>
 
             {/* Save Notes as Files */}
-            <div>
-              <SectionHeader title={t("settings.noteFiles.title")} />
-              <SettingsPanel>
-                <SettingsPanelRow>
-                  <SettingsRow
-                    label={t("settings.noteFiles.title")}
-                    description={t("settings.noteFiles.description")}
-                  >
-                    <Toggle checked={noteFilesEnabled} onChange={handleNoteFilesToggle} />
-                  </SettingsRow>
-                </SettingsPanelRow>
-                {noteFilesEnabled && (
-                  <>
-                    <SettingsPanelRow>
-                      <SettingsRow
-                        label={t("settings.noteFiles.path")}
-                        description={noteFilesPath || noteFilesDefaultPath || "..."}
-                      >
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-xs"
-                          onClick={handleNoteFilesChangePath}
+            {!EGGHEADS_DICTATION_ONLY && (
+              <div>
+                <SectionHeader title={t("settings.noteFiles.title")} />
+                <SettingsPanel>
+                  <SettingsPanelRow>
+                    <SettingsRow
+                      label={t("settings.noteFiles.title")}
+                      description={t("settings.noteFiles.description")}
+                    >
+                      <Toggle checked={noteFilesEnabled} onChange={handleNoteFilesToggle} />
+                    </SettingsRow>
+                  </SettingsPanelRow>
+                  {noteFilesEnabled && (
+                    <>
+                      <SettingsPanelRow>
+                        <SettingsRow
+                          label={t("settings.noteFiles.path")}
+                          description={noteFilesPath || noteFilesDefaultPath || "..."}
                         >
-                          {t("settings.noteFiles.changePath")}
-                        </Button>
-                      </SettingsRow>
-                    </SettingsPanelRow>
-                    <SettingsPanelRow>
-                      <SettingsRow
-                        label={t("settings.noteFiles.rebuild")}
-                        description={t("settings.noteFiles.rebuildDescription")}
-                      >
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-xs"
-                          disabled={noteFilesRebuilding}
-                          onClick={handleNoteFilesRebuild}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={handleNoteFilesChangePath}
+                          >
+                            {t("settings.noteFiles.changePath")}
+                          </Button>
+                        </SettingsRow>
+                      </SettingsPanelRow>
+                      <SettingsPanelRow>
+                        <SettingsRow
+                          label={t("settings.noteFiles.rebuild")}
+                          description={t("settings.noteFiles.rebuildDescription")}
                         >
-                          {noteFilesRebuilding ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            t("settings.noteFiles.rebuild")
-                          )}
-                        </Button>
-                      </SettingsRow>
-                    </SettingsPanelRow>
-                  </>
-                )}
-              </SettingsPanel>
-            </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            disabled={noteFilesRebuilding}
+                            onClick={handleNoteFilesRebuild}
+                          >
+                            {noteFilesRebuilding ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              t("settings.noteFiles.rebuild")
+                            )}
+                          </Button>
+                        </SettingsRow>
+                      </SettingsPanelRow>
+                    </>
+                  )}
+                </SettingsPanel>
+              </div>
+            )}
 
             {/* Floating Icon */}
             <div>
@@ -2697,28 +2707,30 @@ export default function SettingsPage({
             </div>
 
             {/* Dictionary */}
-            <div>
-              <SectionHeader
-                title={t("settingsPage.dictionary.autoLearnTitle", {
-                  defaultValue: "Auto-learn from corrections",
-                })}
-              />
-              <SettingsPanel>
-                <SettingsPanelRow>
-                  <SettingsRow
-                    label={t("settingsPage.dictionary.autoLearnTitle", {
-                      defaultValue: "Auto-learn from corrections",
-                    })}
-                    description={t("settingsPage.dictionary.autoLearnDescription", {
-                      defaultValue:
-                        "When you correct a transcription in the target app, the corrected word is automatically added to your dictionary.",
-                    })}
-                  >
-                    <Toggle checked={autoLearnCorrections} onChange={setAutoLearnCorrections} />
-                  </SettingsRow>
-                </SettingsPanelRow>
-              </SettingsPanel>
-            </div>
+            {!EGGHEADS_DICTATION_ONLY && (
+              <div>
+                <SectionHeader
+                  title={t("settingsPage.dictionary.autoLearnTitle", {
+                    defaultValue: "Auto-learn from corrections",
+                  })}
+                />
+                <SettingsPanel>
+                  <SettingsPanelRow>
+                    <SettingsRow
+                      label={t("settingsPage.dictionary.autoLearnTitle", {
+                        defaultValue: "Auto-learn from corrections",
+                      })}
+                      description={t("settingsPage.dictionary.autoLearnDescription", {
+                        defaultValue:
+                          "When you correct a transcription in the target app, the corrected word is automatically added to your dictionary.",
+                      })}
+                    >
+                      <Toggle checked={autoLearnCorrections} onChange={setAutoLearnCorrections} />
+                    </SettingsRow>
+                  </SettingsPanelRow>
+                </SettingsPanel>
+              </div>
+            )}
 
             {/* Wayland Paste Diagnostics — only on Linux + Wayland */}
             {ydotoolStatus?.isLinux && ydotoolStatus?.isWayland && (
@@ -3261,94 +3273,98 @@ EOF`,
               </SettingsPanel>
             </div>
 
-            {/* Voice Agent Hotkey */}
-            <div>
-              <SectionHeader
-                title={t("settingsPage.general.voiceAgentHotkey.title")}
-                description={t("settingsPage.general.voiceAgentHotkey.description")}
-              />
-              <SettingsPanel>
-                <SettingsPanelRow>
-                  <HotkeyInput
-                    value={voiceAgentKey}
-                    onChange={setVoiceAgentKey}
-                    onClear={() => setVoiceAgentKey("")}
-                    validate={validateVoiceAgentHotkey}
+            {!EGGHEADS_DICTATION_ONLY && (
+              <>
+                {/* Voice Agent Hotkey */}
+                <div>
+                  <SectionHeader
+                    title={t("settingsPage.general.voiceAgentHotkey.title")}
+                    description={t("settingsPage.general.voiceAgentHotkey.description")}
                   />
-                </SettingsPanelRow>
-              </SettingsPanel>
-            </div>
+                  <SettingsPanel>
+                    <SettingsPanelRow>
+                      <HotkeyInput
+                        value={voiceAgentKey}
+                        onChange={setVoiceAgentKey}
+                        onClear={() => setVoiceAgentKey("")}
+                        validate={validateVoiceAgentHotkey}
+                      />
+                    </SettingsPanelRow>
+                  </SettingsPanel>
+                </div>
 
-            {/* Meeting Mode Hotkey */}
-            <div>
-              <SectionHeader
-                title={t("settingsPage.general.meetingHotkey.title")}
-                description={t("settingsPage.general.meetingHotkey.description")}
-              />
-              <SettingsPanel>
-                <SettingsPanelRow>
-                  <HotkeyInput
-                    value={meetingKey}
-                    onChange={async (newHotkey) => {
-                      await registerMeetingHotkey(newHotkey);
-                    }}
-                    onClear={async () => {
-                      await window.electronAPI?.registerMeetingHotkey?.("");
-                      setMeetingKey("");
-                    }}
-                    disabled={isMeetingHotkeyRegistering}
-                    validate={validateMeetingHotkey}
+                {/* Meeting Mode Hotkey */}
+                <div>
+                  <SectionHeader
+                    title={t("settingsPage.general.meetingHotkey.title")}
+                    description={t("settingsPage.general.meetingHotkey.description")}
                   />
-                </SettingsPanelRow>
-                <SettingsPanelRow className="flex items-center justify-between gap-3 border-t border-border/40 dark:border-white/5">
-                  <span className="text-xs text-muted-foreground/80">
-                    {t("settingsPage.general.meetingHotkey.layoutLabel")}
-                  </span>
-                  <Select
-                    value={meetingHotkeyLayoutMode}
-                    onValueChange={(value) =>
-                      setMeetingHotkeyLayoutMode(value as "side-panel" | "full-width")
-                    }
-                  >
-                    <SelectTrigger className="h-7 w-36 text-xs rounded-lg px-2.5 [&>svg]:h-3 [&>svg]:w-3">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem
-                        value="full-width"
-                        className="text-xs py-1.5 pl-2.5 pr-7 rounded-md"
+                  <SettingsPanel>
+                    <SettingsPanelRow>
+                      <HotkeyInput
+                        value={meetingKey}
+                        onChange={async (newHotkey) => {
+                          await registerMeetingHotkey(newHotkey);
+                        }}
+                        onClear={async () => {
+                          await window.electronAPI?.registerMeetingHotkey?.("");
+                          setMeetingKey("");
+                        }}
+                        disabled={isMeetingHotkeyRegistering}
+                        validate={validateMeetingHotkey}
+                      />
+                    </SettingsPanelRow>
+                    <SettingsPanelRow className="flex items-center justify-between gap-3 border-t border-border/40 dark:border-white/5">
+                      <span className="text-xs text-muted-foreground/80">
+                        {t("settingsPage.general.meetingHotkey.layoutLabel")}
+                      </span>
+                      <Select
+                        value={meetingHotkeyLayoutMode}
+                        onValueChange={(value) =>
+                          setMeetingHotkeyLayoutMode(value as "side-panel" | "full-width")
+                        }
                       >
-                        {t("settingsPage.general.meetingHotkey.layoutFullWidth")}
-                      </SelectItem>
-                      <SelectItem
-                        value="side-panel"
-                        className="text-xs py-1.5 pl-2.5 pr-7 rounded-md"
-                      >
-                        {t("settingsPage.general.meetingHotkey.layoutSidePanel")}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </SettingsPanelRow>
-              </SettingsPanel>
-            </div>
+                        <SelectTrigger className="h-7 w-36 text-xs rounded-lg px-2.5 [&>svg]:h-3 [&>svg]:w-3">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem
+                            value="full-width"
+                            className="text-xs py-1.5 pl-2.5 pr-7 rounded-md"
+                          >
+                            {t("settingsPage.general.meetingHotkey.layoutFullWidth")}
+                          </SelectItem>
+                          <SelectItem
+                            value="side-panel"
+                            className="text-xs py-1.5 pl-2.5 pr-7 rounded-md"
+                          >
+                            {t("settingsPage.general.meetingHotkey.layoutSidePanel")}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </SettingsPanelRow>
+                  </SettingsPanel>
+                </div>
 
-            {/* Chat Agent Hotkey */}
-            <div>
-              <SectionHeader
-                title={t("agentMode.settings.hotkey")}
-                description={t("agentMode.settings.hotkeyDescription")}
-              />
-              <SettingsPanel>
-                <SettingsPanelRow>
-                  <HotkeyInput
-                    value={chatAgentKey}
-                    onChange={setChatAgentKey}
-                    onClear={() => setChatAgentKey("")}
-                    validate={validateChatAgentHotkey}
+                {/* Chat Agent Hotkey */}
+                <div>
+                  <SectionHeader
+                    title={t("agentMode.settings.hotkey")}
+                    description={t("agentMode.settings.hotkeyDescription")}
                   />
-                </SettingsPanelRow>
-              </SettingsPanel>
-            </div>
+                  <SettingsPanel>
+                    <SettingsPanelRow>
+                      <HotkeyInput
+                        value={chatAgentKey}
+                        onChange={setChatAgentKey}
+                        onClear={() => setChatAgentKey("")}
+                        validate={validateChatAgentHotkey}
+                      />
+                    </SettingsPanelRow>
+                  </SettingsPanel>
+                </div>
+              </>
+            )}
           </div>
         );
 
@@ -3366,7 +3382,7 @@ EOF`,
                 description={t("settingsPage.privacy.description")}
               />
 
-              {isSignedIn && (
+              {!EGGHEADS_DICTATION_ONLY && isSignedIn && (
                 <div className="mb-4">
                   <SettingsPanel className="mb-2">
                     <SettingsPanelRow>
@@ -3562,7 +3578,8 @@ EOF`,
                   buttonText={t("settingsPage.permissions.grantAccess")}
                 />
 
-                {(platform === "darwin" || canManageSystemAudioInApp(systemAudio)) && (
+                {(platform === "darwin" ||
+                  (!EGGHEADS_DICTATION_ONLY && canManageSystemAudioInApp(systemAudio))) && (
                   <>
                     {platform === "darwin" && (
                       <PermissionCard
@@ -3574,7 +3591,7 @@ EOF`,
                         buttonText={t("settingsPage.permissions.grantAccess")}
                       />
                     )}
-                    {canManageSystemAudioInApp(systemAudio) && (
+                    {!EGGHEADS_DICTATION_ONLY && canManageSystemAudioInApp(systemAudio) && (
                       <PermissionCard
                         icon={Monitor}
                         title={t("settingsPage.permissions.systemAudioTitle")}
@@ -3827,35 +3844,37 @@ EOF`,
               />
 
               <div className="space-y-4">
-                <SettingsPanel>
-                  <SettingsPanelRow>
-                    <SettingsRow
-                      label={t("settingsPage.developer.modelCache")}
-                      description={cachePathHint}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => window.electronAPI?.openWhisperModelsFolder?.()}
-                        >
-                          <FolderOpen className="mr-1.5 h-3.5 w-3.5" />
-                          {t("settingsPage.developer.open")}
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={handleRemoveModels}
-                          disabled={isRemovingModels}
-                        >
-                          {isRemovingModels
-                            ? t("settingsPage.developer.removing")
-                            : t("settingsPage.developer.clearCache")}
-                        </Button>
-                      </div>
-                    </SettingsRow>
-                  </SettingsPanelRow>
-                </SettingsPanel>
+                {!EGGHEADS_DICTATION_ONLY && (
+                  <SettingsPanel>
+                    <SettingsPanelRow>
+                      <SettingsRow
+                        label={t("settingsPage.developer.modelCache")}
+                        description={cachePathHint}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.electronAPI?.openWhisperModelsFolder?.()}
+                          >
+                            <FolderOpen className="mr-1.5 h-3.5 w-3.5" />
+                            {t("settingsPage.developer.open")}
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={handleRemoveModels}
+                            disabled={isRemovingModels}
+                          >
+                            {isRemovingModels
+                              ? t("settingsPage.developer.removing")
+                              : t("settingsPage.developer.clearCache")}
+                          </Button>
+                        </div>
+                      </SettingsRow>
+                    </SettingsPanelRow>
+                  </SettingsPanel>
+                )}
 
                 <SettingsPanel>
                   <SettingsPanelRow>
