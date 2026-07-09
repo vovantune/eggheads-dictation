@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eggheads.local/ai-loop/planning-review-result.schema.json",
+  "title": "Planning Loop Reviewer Result",
+  "type": "object",
+  "required": ["schema_version", "reviewer_role", "verdict", "findings", "required_changes"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "reviewer_role": {
+      "enum": ["yagni_scope", "evidence_contract", "project_dod"]
+    },
+    "verdict": { "enum": ["pass", "fail", "needs_human"] },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "required_changes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "human_decision_reason": { "type": "string", "minLength": 1 }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "findings": {
+            "contains": {
+              "type": "object",
+              "properties": {
+                "severity": { "enum": ["blocker", "critical", "major"] }
+              },
+              "required": ["severity"]
+            }
+          }
+        },
+        "required": ["findings"]
+      },
+      "then": {
+        "properties": {
+          "verdict": { "enum": ["fail", "needs_human"] }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "verdict": { "const": "needs_human" } }, "required": ["verdict"] },
+      "then": { "required": ["human_decision_reason"] }
+    }
+  ],
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "required": ["id", "severity", "summary", "blocking"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "severity": { "enum": ["blocker", "critical", "major", "minor", "nit"] },
+        "summary": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "string", "minLength": 1 },
+        "recommendation": { "type": "string", "minLength": 1 },
+        "blocking": { "type": "boolean" }
+      }
+    }
+  }
+}

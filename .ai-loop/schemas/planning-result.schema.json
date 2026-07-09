@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eggheads.local/ai-loop/planning-result.schema.json",
+  "title": "Planning Loop Planner Result",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "planner_role",
+    "recommended_approach",
+    "rejected_alternative",
+    "evidence",
+    "minimal_contract",
+    "key_risks",
+    "proof_needed"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "planner_role": {
+      "enum": ["reuse", "minimal", "ops", "ux"]
+    },
+    "recommended_approach": { "type": "string", "minLength": 1 },
+    "rejected_alternative": { "type": "string", "minLength": 1 },
+    "evidence": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidence_item" },
+      "minItems": 1
+    },
+    "reuse_lookup_log": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "minimal_contract": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "key_risks": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "proof_needed": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "assumptions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "planner_role": { "const": "reuse" } },
+        "required": ["planner_role"]
+      },
+      "then": { "required": ["reuse_lookup_log"] }
+    }
+  ],
+  "$defs": {
+    "evidence_item": {
+      "type": "object",
+      "required": ["source", "claim"],
+      "additionalProperties": false,
+      "properties": {
+        "source": { "type": "string", "minLength": 1 },
+        "claim": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

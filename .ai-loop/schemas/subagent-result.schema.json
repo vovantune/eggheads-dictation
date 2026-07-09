@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eggheads.local/ai-loop/subagent-result.schema.json",
+  "title": "AI Loop Subagent Result",
+  "type": "object",
+  "required": ["schema_version", "role", "status", "summary", "artifact_paths", "checks", "risks"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "role": { "enum": ["implementer", "reviewer", "fixer", "adjudicator", "planner", "planning_reviewer"] },
+    "status": { "enum": ["completed", "failed_runtime", "needs_human"] },
+    "summary": { "type": "string", "minLength": 1 },
+    "artifact_paths": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "checks": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "risks": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "needs_human_reason": { "type": "string", "minLength": 1 },
+    "implementation": {
+      "type": "object",
+      "required": ["plan_items_covered", "files_changed", "checks_not_run"],
+      "additionalProperties": false,
+      "properties": {
+        "plan_items_covered": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "files_changed": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "checks_not_run": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "planning": {
+      "type": "object",
+      "required": ["result_path", "result_json_path"],
+      "additionalProperties": false,
+      "properties": {
+        "result_path": { "type": "string", "minLength": 1 },
+        "result_json_path": { "type": "string", "minLength": 1 }
+      }
+    },
+    "review": {
+      "type": "object",
+      "required": ["qa_result_path", "qa_markdown_path"],
+      "additionalProperties": false,
+      "properties": {
+        "qa_result_path": { "type": "string", "minLength": 1 },
+        "qa_markdown_path": { "type": "string", "minLength": 1 }
+      }
+    },
+    "planning_review": {
+      "type": "object",
+      "required": ["result_path", "result_json_path"],
+      "additionalProperties": false,
+      "properties": {
+        "result_path": { "type": "string", "minLength": 1 },
+        "result_json_path": { "type": "string", "minLength": 1 }
+      }
+    },
+    "fixes": {
+      "type": "object",
+      "required": ["fixed_findings", "files_changed", "human_decision_findings"],
+      "additionalProperties": false,
+      "properties": {
+        "fixed_findings": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "files_changed": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "human_decision_findings": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "needs_human" } }, "required": ["status"] },
+      "then": { "required": ["needs_human_reason"] }
+    },
+    {
+      "if": { "properties": { "role": { "const": "implementer" } }, "required": ["role"] },
+      "then": { "required": ["implementation"] }
+    },
+    {
+      "if": { "properties": { "role": { "const": "planner" } }, "required": ["role"] },
+      "then": { "required": ["planning"] }
+    },
+    {
+      "if": { "properties": { "role": { "const": "reviewer" } }, "required": ["role"] },
+      "then": { "required": ["review"] }
+    },
+    {
+      "if": { "properties": { "role": { "const": "planning_reviewer" } }, "required": ["role"] },
+      "then": { "required": ["planning_review"] }
+    },
+    {
+      "if": { "properties": { "role": { "const": "fixer" } }, "required": ["role"] },
+      "then": { "required": ["fixes"] }
+    }
+  ]
+}

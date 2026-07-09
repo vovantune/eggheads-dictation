@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eggheads.local/ai-loop/loop-state.schema.json",
+  "title": "AI Loop State",
+  "type": "object",
+  "required": ["schema_version", "loop_id", "loop_type", "status", "iteration", "gate"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "loop_id": { "type": "string", "minLength": 1 },
+    "loop_type": { "enum": ["programming", "planning"] },
+    "runtime": { "type": "string" },
+    "status": {
+      "enum": [
+        "PRECHECK",
+        "GATE_RUNNING",
+        "CONTEXT_BUILDING",
+        "PLANNING_RUNNING",
+        "PLANNING_REVIEW_RUNNING",
+        "SYNTHESIZING",
+        "DELTA_REVIEW_RUNNING",
+        "APPROVED",
+        "HANDOFF_READY",
+        "IMPLEMENTING",
+        "IMPLEMENTED",
+        "QA_RUNNING",
+        "FIX_REQUIRED",
+        "FIXING",
+        "PASSED",
+        "FAILED_RUNTIME",
+        "LOOP_UNSUPPORTED",
+        "HUMAN_DECISION_REQUIRED"
+      ]
+    },
+    "iteration": { "type": "integer", "minimum": 0 },
+    "task_title": { "type": "string" },
+    "approved_plan_path": { "type": "string" },
+    "source_planning_run": { "type": "string" },
+    "handoff_prompt_path": { "type": "string" },
+    "planning": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gate": { "enum": ["lightweight", "light", "full", "blocked-no-subagents"] },
+        "context_pack_path": { "type": "string" },
+        "final_plan_path": { "type": "string" },
+        "approved_plan_path": { "type": "string" },
+        "handoff_prompt_path": { "type": "string" },
+        "planners": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "reviewers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "required": ["fail_on_severity", "max_iterations"],
+      "additionalProperties": false,
+      "properties": {
+        "fail_on_severity": {
+          "type": "array",
+          "items": { "enum": ["blocker", "critical", "major", "minor", "nit"] },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "max_iterations": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": { "type": "boolean" }
+    },
+    "open_findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" },
+      "default": []
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": { "enum": ["not_run", "passed", "failed", "unavailable", "accepted_unavailable"] },
+        "commands": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "last_log_path": { "type": "string" }
+      }
+    },
+    "human_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required": { "type": "boolean" },
+        "reason": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "required": ["id", "severity", "summary", "blocking"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "severity": { "enum": ["blocker", "critical", "major", "minor", "nit"] },
+        "summary": { "type": "string" },
+        "file": { "type": "string" },
+        "blocking": { "type": "boolean" },
+        "status": { "enum": ["open", "fixed", "accepted_non_blocking", "needs_human"] }
+      }
+    }
+  }
+}

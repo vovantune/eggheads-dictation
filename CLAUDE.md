@@ -6,6 +6,34 @@ This document provides comprehensive technical details about the OpenWhispr proj
 
 OpenWhispr is an Electron-based desktop dictation application that uses whisper.cpp for speech-to-text transcription. It supports both local (privacy-focused) and cloud (OpenAI API) processing modes.
 
+## Source of Truth
+
+- `CLAUDE.md` is the canonical assistant entrypoint for this repository; `AGENTS.md` is a compatibility symlink to it.
+- Detailed Planning/Programming Loop protocols live in `docs/agent-planning-loop.md`, `docs/agent-programming-loop.md`, and `.ai-loop/config.yml`.
+- Runtime loop artifacts go under ignored `.ai-loop/runs/`; approved `light`/`full` plans go under `plans/<task-slug>.md`.
+
+## Plan Mode: XP Planning Loop
+
+- If the current session is in Plan Mode (`/plan`, developer Plan Mode) or the user explicitly asks to plan a technical task, use `docs/agent-planning-loop.md` and `.ai-loop/config.yml`.
+- Planning Loop Gate chooses `lightweight`, `light`, `full`, or `blocked-no-subagents`; full protocol, schemas, prompts, artifacts, and handoff are described only in `docs/agent-planning-loop.md`.
+- In Default/Code/Ask/Debug mode before implementation, compute the same gate. If the computed gate requires `light`/`full`, an approved plan for the current scope is required; if no suitable plan exists or it is stale, stop before edits and offer Planning Loop or Delta Review.
+- After approval of a `light`/`full` plan, save the approved plan in `plans/<task-slug>.md`. If a clean session/thread is unavailable, show the handoff prompt from runtime artifacts and do not start implementation in polluted planning context.
+- If an incoming message starts with `PLEASE IMPLEMENT THIS PLAN:`, treat it as a Codex plan-button approval event. Run Planning -> Programming handoff from `docs/agent-planning-loop.md`: save the approved plan and handoff artifacts, run Programming Loop preflight, then start a clean session/thread or fail closed with the handoff prompt; do not start coding in the current planning thread.
+
+## Agent Workflow
+
+- If the user explicitly asks for Programming Loop or requests `implement -> full QA -> fixes until pass`, use `docs/agent-programming-loop.md` and `.ai-loop/config.yml`.
+- Main agent in Programming Loop is an orchestrator, not an implementer/fixer/reviewer: after preflight it prepares state/context/snapshots and launches an independent implementer; it does not make application code/config/docs changes for the plan except loop artifacts and orchestration-only metadata.
+- Loop starts only when independent subagents are available; if runtime lacks required capabilities, stop with `Programming Loop Preflight: loop-unsupported`.
+- Keep the user UX chat-first: do not ask the user to manually run CLI commands or copy prompts. Commands may be used only as an internal runtime/check layer of the orchestrator.
+- Do not use manual/copy-paste fallback and do not simulate independent QA as sequential roles of one agent.
+- For medium/large tasks, first research context, then UX for user-visible changes, then design/spec; start implementation only after explicit user confirmation.
+- For tasks with broad reading, 3+ independent areas, UI QA, release/build risk, or work longer than 10-15 minutes, use subagents when the current mode allows it.
+- The main agent keeps scope, decisions, and final integration; give subagents only narrow independent tasks such as entrypoint search, module analysis, review, risk check, or verification.
+- Do not delegate sequential chains or parallel edits to the same file.
+- Ask subagents for concise findings: important files, facts, risks, recommendations; no large code dumps or raw logs.
+- For long tasks keep compact working state: goal, decisions, key files, checks done, and remaining work; after compaction continue from that state and current diff.
+
 ## Architecture Overview
 
 ### Core Technologies
