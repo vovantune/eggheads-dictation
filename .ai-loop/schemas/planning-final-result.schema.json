@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eggheads.local/ai-loop/planning-final-result.schema.json",
+  "title": "Planning Loop Final Result",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "gate",
+    "status"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "gate": { "enum": ["lightweight", "light", "full", "blocked-no-subagents"] },
+    "status": { "enum": ["draft", "approved", "blocked"] },
+    "block_reason": { "type": "string", "minLength": 1 },
+    "recommended_approach": { "type": "string", "minLength": 1 },
+    "rejected_alternatives": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "source_of_truth": { "type": "string", "minLength": 1 },
+    "non_goals": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "implementation_slices": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "failure_semantics": { "type": "string", "minLength": 1 },
+    "proof_plan": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/proof_item" },
+      "minItems": 1
+    },
+    "evidence_register": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidence_register_item" }
+    },
+    "project_dod": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "assumptions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "handoff": {
+      "type": "object",
+      "required": ["approved_plan_path", "programming_start_prompt"],
+      "additionalProperties": false,
+      "properties": {
+        "approved_plan_path": { "type": "string", "minLength": 1 },
+        "source_planning_run": { "type": "string", "minLength": 1 },
+        "programming_start_prompt": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": { "enum": ["draft", "approved"] },
+          "gate": { "enum": ["light", "full"] }
+        },
+        "required": ["status", "gate"]
+      },
+      "then": {
+        "required": [
+          "recommended_approach",
+          "rejected_alternatives",
+          "source_of_truth",
+          "implementation_slices",
+          "proof_plan",
+          "project_dod"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": { "enum": ["draft", "approved"] },
+          "gate": { "const": "lightweight" }
+        },
+        "required": ["status", "gate"]
+      },
+      "then": {
+        "required": [
+          "recommended_approach"
+        ]
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "approved" } }, "required": ["status"] },
+      "then": { "required": ["handoff"] }
+    },
+    {
+      "if": { "properties": { "status": { "const": "blocked" } }, "required": ["status"] },
+      "then": { "required": ["block_reason"] }
+    }
+  ],
+  "$defs": {
+    "proof_item": {
+      "type": "object",
+      "required": ["claim", "exact_assertion", "check", "failure_mode_caught"],
+      "additionalProperties": false,
+      "properties": {
+        "claim": { "type": "string", "minLength": 1 },
+        "exact_assertion": { "type": "string", "minLength": 1 },
+        "check": { "type": "string", "minLength": 1 },
+        "fixture_input": { "type": "string" },
+        "negative_case": { "type": "string" },
+        "failure_mode_caught": { "type": "string", "minLength": 1 }
+      }
+    },
+    "evidence_register_item": {
+      "type": "object",
+      "required": ["claim", "source", "date_checked", "evidence_used"],
+      "additionalProperties": false,
+      "properties": {
+        "claim": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "date_checked": { "type": "string", "minLength": 1 },
+        "version_endpoint_model": { "type": "string" },
+        "evidence_used": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

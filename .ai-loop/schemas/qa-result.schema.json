@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eggheads.local/ai-loop/qa-result.schema.json",
+  "title": "Programming Loop QA Result",
+  "type": "object",
+  "required": ["schema_version", "verdict", "plan_coverage", "findings", "checks"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "verdict": { "enum": ["pass", "fail", "needs_human"] },
+    "plan_coverage": {
+      "type": "object",
+      "required": ["covered", "summary", "missing_items"],
+      "additionalProperties": false,
+      "properties": {
+        "covered": { "type": "boolean" },
+        "summary": { "type": "string", "minLength": 1 },
+        "missing_items": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "checks": {
+      "type": "object",
+      "required": ["observed", "missing", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "observed": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "missing": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "status": { "enum": ["passed", "failed", "not_run", "unavailable", "accepted_unavailable"] }
+      }
+    },
+    "human_decision_reason": { "type": "string", "minLength": 1 },
+    "source_iteration": { "type": "integer", "minimum": 1 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "verdict": { "const": "pass" } }, "required": ["verdict"] },
+      "then": {
+        "properties": {
+          "plan_coverage": {
+            "properties": {
+              "covered": { "const": true },
+              "missing_items": { "maxItems": 0 }
+            }
+          },
+          "checks": {
+            "properties": {
+              "status": { "enum": ["passed", "accepted_unavailable"] },
+              "missing": { "maxItems": 0 }
+            }
+          },
+          "findings": {
+            "not": {
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "severity": { "enum": ["blocker", "critical", "major"] }
+                },
+                "required": ["severity"]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "findings": {
+            "contains": {
+              "type": "object",
+              "properties": {
+                "severity": { "enum": ["blocker", "critical", "major"] }
+              },
+              "required": ["severity"]
+            }
+          }
+        },
+        "required": ["findings"]
+      },
+      "then": {
+        "properties": {
+          "verdict": { "enum": ["fail", "needs_human"] }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "plan_coverage": {
+            "properties": { "covered": { "const": false } },
+            "required": ["covered"]
+          }
+        },
+        "required": ["plan_coverage"]
+      },
+      "then": {
+        "properties": {
+          "verdict": { "enum": ["fail", "needs_human"] }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "checks": {
+            "properties": { "status": { "enum": ["failed", "not_run", "unavailable"] } },
+            "required": ["status"]
+          }
+        },
+        "required": ["checks"]
+      },
+      "then": {
+        "properties": {
+          "verdict": { "enum": ["fail", "needs_human"] }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "verdict": { "const": "needs_human" } }, "required": ["verdict"] },
+      "then": { "required": ["human_decision_reason"] }
+    }
+  ],
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "required": ["id", "severity", "summary", "blocking"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "severity": { "enum": ["blocker", "critical", "major", "minor", "nit"] },
+        "summary": { "type": "string", "minLength": 1 },
+        "file": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "string", "minLength": 1 },
+        "recommendation": { "type": "string", "minLength": 1 },
+        "blocking": { "type": "boolean" }
+      }
+    }
+  }
+}

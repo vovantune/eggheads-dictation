@@ -1,0 +1,60 @@
+version: 1
+runtime_contract: universal-chat-native-loop
+
+storage:
+  root: .ai-loop
+  runs: .ai-loop/runs
+
+loop_types:
+  programming:
+    document: docs/agent-programming-loop.md
+    state_schema: .ai-loop/schemas/loop-state.schema.json
+    reviewer_schema: .ai-loop/schemas/qa-result.schema.json
+    subagent_result_schema: .ai-loop/schemas/subagent-result.schema.json
+    prompts:
+      context_pack: .ai-loop/prompts/shared/context-pack.md
+      subagent_contract: .ai-loop/prompts/shared/subagent-contract.md
+      implementer: .ai-loop/prompts/programming/implementer.md
+      reviewer: .ai-loop/prompts/programming/qa-reviewer.md
+      fixer: .ai-loop/prompts/programming/fixer.md
+
+  planning:
+    document: docs/agent-planning-loop.md
+    state_schema: .ai-loop/schemas/loop-state.schema.json
+    planner_schema: .ai-loop/schemas/planning-result.schema.json
+    reviewer_schema: .ai-loop/schemas/planning-review-result.schema.json
+    final_schema: .ai-loop/schemas/planning-final-result.schema.json
+    subagent_result_schema: .ai-loop/schemas/subagent-result.schema.json
+    prompts:
+      context_pack: .ai-loop/prompts/shared/context-pack.md
+      subagent_contract: .ai-loop/prompts/planning/subagent-contract.md
+      context_builder: .ai-loop/prompts/planning/context-builder.md
+      planner_reuse: .ai-loop/prompts/planning/planner-reuse.md
+      planner_minimal: .ai-loop/prompts/planning/planner-minimal.md
+      planner_ops: .ai-loop/prompts/planning/planner-ops.md
+      planner_ux: .ai-loop/prompts/planning/planner-ux.md
+      reviewer_yagni_scope: .ai-loop/prompts/planning/reviewer-yagni-scope.md
+      reviewer_evidence_contract: .ai-loop/prompts/planning/reviewer-evidence-contract.md
+      reviewer_project_dod: .ai-loop/prompts/planning/reviewer-project-dod.md
+      synthesis: .ai-loop/prompts/planning/synthesis.md
+      delta_review: .ai-loop/prompts/planning/delta-review.md
+      handoff: .ai-loop/prompts/planning/handoff.md
+
+capabilities:
+  required:
+    - spawn_independent_subagent
+    - read_subagent_result
+    - persist_loop_state
+    - read_workspace_snapshot
+    - run_checks_or_record_unavailable_policy
+
+gate:
+  fail_on_severity:
+    - blocker
+    - critical
+    - major
+  max_iterations: 5
+
+checks:
+  source: project_rules
+  unavailable_requires_human_decision: true
