@@ -1,3 +1,42 @@
+# EGGHEADS Fork Agent Contract
+
+## Core Rules
+
+- Use Russian by default for user-facing communication unless the user asks otherwise.
+- Ground decisions in code, commands, logs, tests, product impact, or other observable facts; do not justify choices with intuition or vibes.
+- In analysis, review, and debug tasks, do not change files unless the user explicitly asks for implementation.
+- Do not edit `node_modules`, vendored dependency sources, or library source code. Patch in the parent project instead, unless no practical alternative exists and the user approves the dependency-source change.
+- Find the root cause before applying a fix; keep changes focused, small, and reversible.
+
+## EGGHEADS Fork Contract
+
+- This repository is the EGGHEADS desktop dictation fork for macOS and Windows. Preserve a clear path for future upstream updates.
+- `origin` is `vovantune/eggheads-dictation`; `upstream` is `OpenWhispr/openwhispr`. Never push to upstream.
+- Before creating a commit, push, or PR, verify the base/head repository and branch. PRs target `vovantune/eggheads-dictation` unless the user explicitly says otherwise.
+- Prefer small PRs with narrow ownership and minimal churn. Do not reformat or rewrite unrelated architecture reference text.
+
+## CI And Release Guardrails
+
+- Do not enable heavy desktop builds, release jobs, signing, notarization, helper-binary workflows, or expensive infrastructure by default without a user decision.
+- Keep PR quality gates when they are lightweight and do not require secrets or paid infrastructure.
+- Keep unsigned baseline builds separate from signed/notarized releases. Treat signing, notarization, and Azure Trusted Signing as explicit release scope.
+
+## EGGHEADS Product Defaults
+
+- The user should not manually paste service tokens in the normal MVP flow.
+- Default connection flow: connect button, browser/auth handoff, desktop callback, and secure token storage.
+- Keep endpoint, model, and provider defaults in one source of truth.
+- Do not expose raw tokens, API keys, stack traces, internal IDs, or provider internals in user-facing UI.
+
+## Context Routing
+
+- Packaging/signing/CI: inspect workflows, Electron Builder config, entitlements, helper binaries, and release boundaries first.
+- Auth/connect/secrets: inspect the browser auth handoff, desktop callback, secure storage, IPC, and token lifecycle first.
+- Transcription/audio: inspect recorder hooks, audio IPC, whisper/parakeet helpers, FFmpeg paths, and temp-file cleanup first.
+- UI/settings: inspect React components, settings store/hooks, shadcn/Radix usage, and existing layout conventions first.
+- Providers/models: inspect the model registry, provider registry, inference scopes, and source-of-truth config first.
+- Planning/Programming Loop: use the short links and protocols below; do not duplicate the full loop docs here.
+
 # OpenWhispr Technical Reference for AI Assistants
 
 This document provides comprehensive technical details about the OpenWhispr project architecture for AI assistants working on the codebase.
