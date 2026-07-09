@@ -4,6 +4,7 @@ import logger from "../utils/logger";
 import { useLocalStorage } from "./useLocalStorage";
 import type { LocalTranscriptionProvider, InferenceMode, SelfHostedType } from "../types/electron";
 import type { Snippet } from "../utils/snippets";
+import { EGGHEADS_DICTATION_ONLY } from "../lib/features";
 
 export interface TranscriptionSettings {
   uiLanguage: string;
@@ -177,6 +178,27 @@ function useSettingsInternal() {
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.electronAPI?.syncStartupPreferences) return;
+
+    if (EGGHEADS_DICTATION_ONLY) {
+      window.electronAPI
+        .syncStartupPreferences({
+          useLocalWhisper: false,
+          localTranscriptionProvider: "whisper",
+          model: undefined,
+          cleanupProvider: "openai",
+          cleanupModel: undefined,
+          dictationAgentProvider: "openai",
+          dictationAgentModel: undefined,
+        })
+        .catch((err) =>
+          logger.warn(
+            "Failed to clear disabled startup preferences",
+            { error: (err as Error).message },
+            "settings"
+          )
+        );
+      return;
+    }
 
     const model = localTranscriptionProvider === "nvidia" ? parakeetModel : whisperModel;
     window.electronAPI

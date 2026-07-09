@@ -176,7 +176,7 @@
       "systemAudioDescription": "Permite que o gravador de reuniões ouça o outro lado das suas chamadas — reuniões, aulas, podcasts. Você pode ativar depois nas Configurações.",
       "optional": "Opcional",
       "recommended": "Recomendado",
-      "accessibilityTroubleshooting": "Em Configurações do Sistema → Acessibilidade, desative o interruptor do OpenWhispr e ative-o novamente. Se isso não funcionar, remova o OpenWhispr da lista e adicione-o de volta. Ainda com problemas? Envie um e-mail para support@openwhispr.com."
+      "accessibilityTroubleshooting": "Em Configurações do Sistema → Acessibilidade, desative o interruptor do EGGHEADS Dictation e ative-o novamente. Se isso não funcionar, remova o EGGHEADS Dictation da lista e adicione-o de volta. Ainda com problemas? Envie um e-mail para support@eggheads.solutions."
     },
     "transcription": {
       "title": "Configuração de transcrição",
@@ -526,7 +526,7 @@
         "description": "Não foi possível transcrever parte da gravação."
       },
       "errorDescriptions": {
-        "sessionExpired": "Sua sessão do OpenWhispr Cloud está indisponível. Entre novamente nas Configurações.",
+        "sessionExpired": "Sua sessão do EGGHEADS Dictation está indisponível. Entre novamente no EGGHEADS pelas Configurações.",
         "offline": "Você está offline. A transcrição na nuvem exige conexão com a internet.",
         "dailyLimitReached": "Você atingiu o limite de transcrições de hoje. Tente novamente amanhã ou faça upgrade do seu plano.",
         "providerRateLimited": "Seu provedor de transcrição limitou a solicitação. Aguarde um momento e tente novamente."

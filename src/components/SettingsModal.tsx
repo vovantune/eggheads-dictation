@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import SidebarModal, { type SidebarItem } from "./ui/SidebarModal";
 import SettingsPage, { SettingsSectionType } from "./SettingsPage";
-import { WORKSPACES_ENABLED } from "../lib/features";
+import { EGGHEADS_DICTATION_ONLY, WORKSPACES_ENABLED } from "../lib/features";
 
 export type { SettingsSectionType };
 
@@ -63,14 +63,18 @@ export default function SettingsModal({ open, onOpenChange, initialSection }: Se
         description: t("settingsModal.sections.account.description"),
         group: t("settingsModal.groups.account"),
       },
-      {
-        id: "plansBilling",
-        label: t("settingsModal.sections.plansBilling.label"),
-        icon: CreditCard,
-        description: t("settingsModal.sections.plansBilling.description"),
-        group: t("settingsModal.groups.account"),
-      },
-      ...(WORKSPACES_ENABLED
+      ...(!EGGHEADS_DICTATION_ONLY
+        ? [
+            {
+              id: "plansBilling" as const,
+              label: t("settingsModal.sections.plansBilling.label"),
+              icon: CreditCard,
+              description: t("settingsModal.sections.plansBilling.description"),
+              group: t("settingsModal.groups.account"),
+            },
+          ]
+        : []),
+      ...(!EGGHEADS_DICTATION_ONLY && WORKSPACES_ENABLED
         ? [
             {
               id: "workspace" as const,
@@ -95,20 +99,24 @@ export default function SettingsModal({ open, onOpenChange, initialSection }: Se
         description: t("settingsModal.sections.hotkeys.description"),
         group: t("settingsModal.groups.app"),
       },
-      {
-        id: "speechToText",
-        label: t("settingsModal.sections.speechToText.label"),
-        icon: Mic,
-        description: t("settingsModal.sections.speechToText.description"),
-        group: t("settingsModal.groups.aiModels"),
-      },
-      {
-        id: "llms",
-        label: t("settingsModal.sections.llms.label"),
-        icon: Brain,
-        description: t("settingsModal.sections.llms.description"),
-        group: t("settingsModal.groups.aiModels"),
-      },
+      ...(!EGGHEADS_DICTATION_ONLY
+        ? [
+            {
+              id: "speechToText" as const,
+              label: t("settingsModal.sections.speechToText.label"),
+              icon: Mic,
+              description: t("settingsModal.sections.speechToText.description"),
+              group: t("settingsModal.groups.aiModels"),
+            },
+            {
+              id: "llms" as const,
+              label: t("settingsModal.sections.llms.label"),
+              icon: Brain,
+              description: t("settingsModal.sections.llms.description"),
+              group: t("settingsModal.groups.aiModels"),
+            },
+          ]
+        : []),
       {
         id: "privacyData",
         label: t("settingsModal.sections.privacyData.label"),
@@ -130,6 +138,9 @@ export default function SettingsModal({ open, onOpenChange, initialSection }: Se
   const resolveSection = (section: string | undefined): SettingsSectionType => {
     if (!section) return "account";
     const resolved = (SECTION_ALIASES[section] ?? section) as SettingsSectionType;
+    if (EGGHEADS_DICTATION_ONLY && ["plansBilling", "workspace", "speechToText", "llms"].includes(resolved)) {
+      return "account";
+    }
     if (resolved === "workspace" && !WORKSPACES_ENABLED) return "account";
     return resolved;
   };

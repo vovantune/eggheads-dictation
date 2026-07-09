@@ -9,11 +9,13 @@ import {
   updateLastSignInTime,
   type SocialProvider,
 } from "../lib/auth";
+import { EGGHEADS_DICTATION_ONLY } from "../lib/features";
 import { OPENWHISPR_API_URL } from "../config/constants";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { AlertCircle, ArrowRight, Check, Loader2, ChevronLeft } from "lucide-react";
 import logoIcon from "../assets/icon.png";
+import eggheadsLogo from "../assets/eggheads-logo.svg";
 import logger from "../utils/logger";
 import { getCachedPlatform } from "../utils/platform";
 import ForgotPasswordView from "./ForgotPasswordView";
@@ -97,8 +99,7 @@ export default function AuthenticationStep({
   }, []);
 
   useEffect(() => {
-    if (!isLoaded || !isSignedIn || needsVerificationRef.current || !user?.id || !user?.email)
-      return;
+    if (!isLoaded || !isSignedIn || needsVerificationRef.current || !user?.id) return;
     onAuthComplete();
   }, [isLoaded, isSignedIn, user, onAuthComplete]);
 
@@ -350,6 +351,60 @@ export default function AuthenticationStep({
           <span className="text-sm font-medium">{t("auth.common.continue")}</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </Button>
+      </div>
+    );
+  }
+
+  if (EGGHEADS_DICTATION_ONLY) {
+    return (
+      <div className="space-y-3">
+        <div className="text-center mb-4">
+          <img
+            src={eggheadsLogo}
+            alt="EGGHEADS"
+            className="h-7 w-auto mx-auto mb-3 dark:invert"
+          />
+          <p className="text-lg font-semibold text-foreground tracking-tight leading-tight">
+            EGGHEADS Dictation
+          </p>
+          <p className="text-muted-foreground text-sm mt-1 leading-tight">
+            Войдите через EGGHEADS, чтобы подключить диктовку на этом устройстве.
+          </p>
+        </div>
+
+        <Button
+          type="button"
+          variant="default"
+          onClick={() => handleSocialSignIn("eggheads")}
+          disabled={isSocialLoading !== null || !oauthProtocolRegistered}
+          title={!oauthProtocolRegistered ? t("auth.social.protocolUnavailable") : undefined}
+          className="w-full h-9"
+        >
+          {isSocialLoading === "eggheads" ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm font-medium">{t("auth.social.completeInBrowser")}</span>
+            </>
+          ) : (
+            <>
+              <span className="text-sm font-medium">Подключить EGGHEADS</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </>
+          )}
+        </Button>
+
+        {!oauthProtocolRegistered && (
+          <p className="text-xs text-muted-foreground/80 leading-tight text-center">
+            {t("auth.social.protocolUnavailable")}
+          </p>
+        )}
+
+        {error && (
+          <div className="px-3 py-2 rounded-md bg-destructive/5 border border-destructive/20 flex items-center gap-2">
+            <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
+            <p className="text-xs text-destructive">{error}</p>
+          </div>
+        )}
       </div>
     );
   }

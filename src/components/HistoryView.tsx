@@ -10,6 +10,7 @@ import { cn } from "./lib/utils";
 import { useUpcomingEvents } from "../hooks/useUpcomingEvents";
 import UpcomingMeetings from "./UpcomingMeetings";
 import { useSettingsStore } from "../stores/settingsStore";
+import { EGGHEADS_DICTATION_ONLY } from "../lib/features";
 
 interface HistoryViewProps {
   history: TranscriptionItemType[];
@@ -130,7 +131,7 @@ export default function HistoryView({
           </div>
         )}
 
-        {!useCleanupModel && !aiCTADismissed && (
+        {!EGGHEADS_DICTATION_ONLY && !useCleanupModel && !aiCTADismissed && (
           <div className="mb-3 relative rounded-lg border border-primary/20 bg-primary/5 dark:bg-primary/10 p-3">
             <button
               onClick={() => {

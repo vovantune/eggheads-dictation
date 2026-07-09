@@ -6,6 +6,8 @@ const debugLogger = require("./debugLogger");
 const { normalizeUiLanguage } = require("./i18nMain");
 const secretCrypto = require("./secretCrypto");
 
+const EGGHEADS_DICTATION_ONLY = true;
+
 const SECRET_KEYS = [
   "OPENAI_API_KEY",
   "ANTHROPIC_API_KEY",
@@ -494,6 +496,7 @@ class EnvironmentManager {
 
   getActivationMode() {
     const mode = this._getKey("ACTIVATION_MODE");
+    if (!mode && EGGHEADS_DICTATION_ONLY) return "push";
     return mode === "push" ? "push" : "tap";
   }
 
@@ -537,7 +540,7 @@ class EnvironmentManager {
   }
 
   getUiLanguage() {
-    return normalizeUiLanguage(this._getKey("UI_LANGUAGE"));
+    return normalizeUiLanguage(this._getKey("UI_LANGUAGE") || (EGGHEADS_DICTATION_ONLY ? "ru" : "en"));
   }
 
   saveUiLanguage(language) {

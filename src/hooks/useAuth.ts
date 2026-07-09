@@ -1,45 +1,76 @@
-import { useEffect, useRef } from "react";
-import { authClient, isWithinGracePeriod } from "../lib/auth";
+import { useCallback, useEffect, useState } from "react";
 import logger from "../utils/logger";
 import { useSettingsStore } from "../stores/settingsStore";
 
-const useStaticSession = () => ({
-  data: null,
-  isPending: false,
-  error: null,
-  refetch: async () => null,
-});
+interface EggheadsUser {
+  id: string;
+  email?: string | null;
+  name?: string | null;
+  image?: string | null;
+  login?: string | null;
+  display_name?: string | null;
+}
+
+interface AuthState {
+  isLoaded: boolean;
+  isSignedIn: boolean;
+  user: EggheadsUser | null;
+}
 
 export function useAuth() {
-  const useSession = authClient?.useSession ?? useStaticSession;
-  const { data: session, isPending } = useSession();
-  const user = session?.user ?? null;
-  const rawIsSignedIn = Boolean(user);
-  const gracePeriodActive = isWithinGracePeriod();
+  const [state, setState] = useState<AuthState>({
+    isLoaded: false,
+    isSignedIn: false,
+    user: null,
+  });
 
-  // Only sync true to the store — signOut() handles setting false via localStorage + reload.
-  // Better Auth's useSession() flickers in Electron (renderer can't see the main-process cookie until reload).
-  const isSignedIn = rawIsSignedIn || gracePeriodActive;
+  const applySession = useCallback((session: any) => {
+    const signedIn = Boolean(session?.signedIn && session?.user);
+    const user = signedIn ? session.user : null;
+    setState({ isLoaded: true, isSignedIn: signedIn, user });
+    useSettingsStore.getState().setIsSignedIn(signedIn);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("isSignedIn", String(signedIn));
+      if (signedIn) {
+        localStorage.setItem("onboardingCompleted", "true");
+        localStorage.removeItem("authenticationSkipped");
+        localStorage.removeItem("skipAuth");
+      }
+    }
+    logger.debug("EGGHEADS auth state sync", { signedIn }, "auth");
+  }, []);
 
-  const lastSyncedRef = useRef(false);
-
-  useEffect(() => {
-    if (!isPending && isSignedIn && !lastSyncedRef.current) {
-      logger.debug(
-        "Auth state sync",
-        { isSignedIn, rawIsSignedIn, gracePeriod: gracePeriodActive },
+  const refresh = useCallback(async () => {
+    try {
+      const session = await window.electronAPI?.authGetSession?.();
+      applySession(session);
+    } catch (error) {
+      logger.warn(
+        "Failed to load EGGHEADS auth session",
+        { error: error instanceof Error ? error.message : String(error) },
         "auth"
       );
-      useSettingsStore.getState().setIsSignedIn(true);
-      lastSyncedRef.current = true;
+      applySession({ signedIn: false, user: null });
     }
-  }, [isSignedIn, rawIsSignedIn, gracePeriodActive, isPending]);
+  }, [applySession]);
+
+  useEffect(() => {
+    refresh();
+    const dispose = window.electronAPI?.onAuthSessionChanged?.((user: EggheadsUser | null) => {
+      applySession(user ? { signedIn: true, user } : { signedIn: false, user: null });
+    });
+    window.addEventListener("focus", refresh);
+    return () => {
+      dispose?.();
+      window.removeEventListener("focus", refresh);
+    };
+  }, [applySession, refresh]);
 
   return {
-    isSignedIn,
-    isGracePeriodOnly: !rawIsSignedIn && gracePeriodActive,
-    isLoaded: !isPending,
-    session,
-    user,
+    isSignedIn: state.isSignedIn,
+    isGracePeriodOnly: false,
+    isLoaded: state.isLoaded,
+    session: state.user ? { user: state.user } : null,
+    user: state.user,
   };
 }

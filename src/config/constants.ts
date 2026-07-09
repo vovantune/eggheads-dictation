@@ -62,10 +62,11 @@ const DEFAULT_OPENAI_BASE = computeBaseUrl(
 
 const DEFAULT_TRANSCRIPTION_BASE = computeBaseUrl(
   [
+    env.VITE_EGGHEADS_API_URL as string | undefined,
     env.OPENWHISPR_TRANSCRIPTION_BASE_URL as string | undefined,
     env.WHISPER_BASE_URL as string | undefined,
   ],
-  DEFAULT_OPENAI_BASE
+  "https://ai-backend.eggheads.solutions/v1"
 );
 
 export const API_ENDPOINTS = {
@@ -115,6 +116,8 @@ export const CACHE_CONFIG = {
 
 // OpenWhispr Cloud API
 export const OPENWHISPR_API_URL = (env.VITE_OPENWHISPR_API_URL as string) || "";
+export const EGGHEADS_API_URL =
+  (env.VITE_EGGHEADS_API_URL as string) || "https://ai-backend.eggheads.solutions";
 
 // Retry Configuration
 export const RETRY_CONFIG = {

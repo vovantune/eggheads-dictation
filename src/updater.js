@@ -35,8 +35,8 @@ class UpdateManager {
 
     autoUpdater.setFeedURL({
       provider: "github",
-      owner: "OpenWhispr",
-      repo: "openwhispr",
+      owner: process.env.EGGHEADS_UPDATE_OWNER || "vovantune",
+      repo: process.env.EGGHEADS_UPDATE_REPO || "eggheads-dictation",
       private: false,
     });
 

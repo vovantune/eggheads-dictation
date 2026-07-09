@@ -197,7 +197,7 @@
       "systemAudioDescription": "让会议录音机听到通话另一方的声音 — 会议、讲座、播客。你可以稍后在“设置”中开启。",
       "optional": "可选",
       "recommended": "推荐",
-      "accessibilityTroubleshooting": "在系统设置 → 辅助功能中，将 OpenWhispr 的开关关闭再重新打开。如果无效，请将 OpenWhispr 从列表中移除后重新添加。还是不行？请发邮件至 support@openwhispr.com。"
+      "accessibilityTroubleshooting": "在系统设置 → 辅助功能中，将 EGGHEADS Dictation 的开关关闭再重新打开。如果无效，请将 EGGHEADS Dictation 从列表中移除后重新添加。还是不行？请发邮件至 support@eggheads.solutions。"
     },
     "transcription": {
       "title": "转录设置",
@@ -547,7 +547,7 @@
         "description": "部分录音内容无法转录。"
       },
       "errorDescriptions": {
-        "sessionExpired": "OpenWhispr Cloud 会话不可用。请到「设置」中重新登录。",
+        "sessionExpired": "EGGHEADS Dictation 会话不可用。请到「设置」中重新登录 EGGHEADS。",
         "offline": "你目前离线。云端转录需要互联网连接。",
         "dailyLimitReached": "已达今日转录上限。请明天再试或升级你的套餐。",
         "providerRateLimited": "你的转录服务商限制了请求频率。请稍候再试。"

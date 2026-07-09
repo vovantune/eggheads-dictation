@@ -33,6 +33,7 @@ import { detectAgentName } from "../config/agentDetection";
 import { resolveDictationRouteKind, resolveDictationAgentReachability } from "./dictationRouting";
 import { resolvePrompt } from "../config/prompts";
 import { syncService } from "../services/SyncService.js";
+import { EGGHEADS_DICTATION_ONLY } from "../lib/features";
 import { evaluateFinishedRecording } from "./recordingValidation";
 import { matchesDictionaryPrompt } from "../utils/dictionaryEchoFilter.js";
 import { getDictionaryHintWords } from "../utils/snippets";
@@ -737,12 +738,9 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
     }
 
     try {
-      const useLocalWhisper = settings.useLocalWhisper;
-      const localProvider = settings.localTranscriptionProvider;
-      const whisperModel = settings.whisperModel;
-      const parakeetModel = settings.parakeetModel || "parakeet-tdt-0.6b-v3";
-
-      const cloudTranscriptionMode = settings.cloudTranscriptionMode;
+      const useLocalWhisper = false;
+      const localProvider = "disabled";
+      const cloudTranscriptionMode = "openwhispr";
       const isSignedIn = settings.isSignedIn;
 
       const isOpenWhisprCloudMode = !useLocalWhisper && cloudTranscriptionMode === "openwhispr";
@@ -755,28 +753,21 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
 
       let result;
       let activeModel;
-      if (useLocalWhisper) {
-        if (localProvider === "nvidia") {
-          activeModel = parakeetModel;
-          result = await this.processWithLocalParakeet(audioBlob, parakeetModel, metadata);
-        } else {
-          activeModel = whisperModel;
-          result = await this.processWithLocalWhisper(audioBlob, whisperModel, metadata);
-        }
-      } else if (isOpenWhisprCloudMode) {
+      if (isOpenWhisprCloudMode) {
         if (!isSignedIn) {
           const err = new Error(
-            "OpenWhispr Cloud requires sign-in. Please sign in again or switch to BYOK mode."
+            "EGGHEADS Dictation requires sign-in. Please connect your EGGHEADS account again."
           );
           err.code = "AUTH_REQUIRED";
           err.messageKey = "hooks.audioRecording.errorDescriptions.sessionExpired";
           throw err;
         }
-        activeModel = "openwhispr-cloud";
+        activeModel = "eggheads-cloud";
         result = await this.processWithOpenWhisprCloud(audioBlob, metadata);
       } else {
-        activeModel = this.getTranscriptionModel();
-        result = await this.processWithOpenAIAPI(audioBlob, metadata);
+        throw Object.assign(new Error("EGGHEADS Dictation cloud route unavailable"), {
+          code: "AUTH_REQUIRED",
+        });
       }
 
       if (!this.isProcessing) {
@@ -793,7 +784,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
 
       this.onTranscriptionComplete?.(result);
 
-      if (result?.source === "openwhispr") {
+      if (result?.source === "eggheads") {
         window.dispatchEvent(new Event("usage-changed"));
       }
 
@@ -1526,17 +1517,8 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
     const language = getBaseLanguageCode(settings.preferredLanguage);
 
     const arrayBuffer = await audioBlob.arrayBuffer();
-    const audioSizeBytes = audioBlob.size;
-    const audioFormat = audioBlob.type;
     const opts = {};
     if (language) opts.language = language;
-    const cleanupCloudMode = settings.cleanupCloudMode || "openwhispr";
-    if (settings.useCleanupModel && !this.skipReasoning && cleanupCloudMode === "openwhispr") {
-      opts.sendLogs = "false";
-    }
-
-    const dictionaryPrompt = this.getCustomDictionaryPrompt();
-    if (dictionaryPrompt) opts.prompt = dictionaryPrompt;
 
     // Use withSessionRefresh to handle AUTH_EXPIRED automatically
     const transcriptionStart = performance.now();
@@ -1552,86 +1534,12 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
     timings.transcriptionProcessingDurationMs = Math.round(performance.now() - transcriptionStart);
 
     const rawText = result.text;
-    if (this.isDictionaryEcho(rawText)) {
-      throw new Error("No audio detected");
-    }
-    let processedText = result.text;
-    if (processedText && !this.skipReasoning) {
-      const reasoningStart = performance.now();
-      const agentName = localStorage.getItem("agentName") || null;
-      const route = resolveReasoningRoute(
-        processedText,
-        settings,
-        agentName,
-        this.voiceAgentRequested
-      );
-      const cleanupCloudMode = settings.cleanupCloudMode || "openwhispr";
-
-      try {
-        if (route.kind === "agent") {
-          const reasoned = await this.processWithReasoningModel(
-            processedText,
-            route.model,
-            agentName,
-            route.config
-          );
-          if (reasoned) processedText = reasoned;
-        } else if (route.kind === "cleanup" && cleanupCloudMode === "openwhispr") {
-          const reasonResult = await withSessionRefresh(async () => {
-            const res = await window.electronAPI.cloudReason(processedText, {
-              agentName,
-              promptMode: "cleanup",
-              customDictionary: getDictionaryHintWords(settings),
-              customPrompt: this.getCustomPrompt(),
-              language: settings.preferredLanguage || "auto",
-              locale: settings.uiLanguage || "en",
-              sttProvider: result.sttProvider,
-              sttModel: result.sttModel,
-              sttProcessingMs: result.sttProcessingMs,
-              sttWordCount: result.sttWordCount,
-              sttLanguage: result.sttLanguage,
-              audioDurationMs: result.audioDurationMs,
-              audioSizeBytes,
-              audioFormat,
-            });
-            if (!res.success) {
-              const err = new Error(res.error || "Cloud reasoning failed");
-              err.code = res.code;
-              throw err;
-            }
-            return res;
-          });
-
-          if (reasonResult.success) {
-            processedText = reasonResult.text;
-          }
-        } else if (route.kind === "cleanup") {
-          const effectiveModel = getEffectiveCleanupModel();
-          if (effectiveModel) {
-            const reasoned = await this.processWithReasoningModel(
-              processedText,
-              effectiveModel,
-              agentName,
-              route.config
-            );
-            if (reasoned) processedText = reasoned;
-          }
-        }
-      } catch (reasonError) {
-        logger.error(
-          "Cloud reasoning failed, using raw transcription",
-          { error: reasonError.message },
-          "transcription"
-        );
-      }
-      timings.reasoningProcessingDurationMs = Math.round(performance.now() - reasoningStart);
-    }
 
     return {
       success: true,
-      text: processedText,
+      text: rawText,
       rawText,
-      source: "openwhispr",
+      source: "eggheads",
       timings,
       limitReached: result.limitReached,
       wordsUsed: result.wordsUsed,
@@ -2315,7 +2223,9 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
       const result = await window.electronAPI.saveTranscription(text, rawText, {
         clientTranscriptionId,
       });
-      if (result?.id) syncService.debouncedPush("transcription", result.id);
+      if (result?.id && !EGGHEADS_DICTATION_ONLY) {
+        syncService.debouncedPush("transcription", result.id);
+      }
 
       // Save audio if we have a captured blob and the transcription was saved successfully
       if (result?.id && this.lastAudioBlob) {
@@ -2354,7 +2264,9 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
         errorMessage,
         errorCode,
       });
-      if (result?.id) syncService.debouncedPush("transcription", result.id);
+      if (result?.id && !EGGHEADS_DICTATION_ONLY) {
+        syncService.debouncedPush("transcription", result.id);
+      }
 
       if (result?.id && this.lastAudioBlob) {
         try {
@@ -2409,7 +2321,9 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
         });
       }
 
-      syncService.debouncedPush("transcription", savedId);
+      if (!EGGHEADS_DICTATION_ONLY) {
+        syncService.debouncedPush("transcription", savedId);
+      }
     } catch (error) {
       logger.error(
         "Failed to save discarded transcription record",
@@ -2841,7 +2755,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
       } else if (error.code === "AUTH_EXPIRED" || error.code === "AUTH_REQUIRED") {
         errorTitle = "Sign-in Required";
         errorDescription =
-          "Your OpenWhispr Cloud session is unavailable. Please sign in again from Settings.";
+          "Your EGGHEADS Dictation session is unavailable. Please sign in to EGGHEADS again from Settings.";
       } else if (error.code === "NETWORK_ERROR") {
         errorTitle = "streaming.errors.cloudUnreachable.title";
         errorDescription = error.messageKey || "streaming.errors.cloudUnreachable.generic";

@@ -9,9 +9,9 @@ import WindowControls from "./components/WindowControls.tsx";
 import { Card, CardContent } from "./components/ui/card.tsx";
 import { useAuth } from "./hooks/useAuth";
 import { useTheme } from "./hooks/useTheme";
+import { EGGHEADS_DICTATION_ONLY } from "./lib/features";
 
 const ControlPanel = React.lazy(() => import("./components/ControlPanel.tsx"));
-const OnboardingFlow = React.lazy(() => import("./components/OnboardingFlow.tsx"));
 const AgentOverlay = React.lazy(() => import("./components/AgentOverlay.tsx"));
 
 export default function AppRouter() {
@@ -34,18 +34,16 @@ export default function AppRouter() {
 }
 
 function MainApp() {
-  const { isSignedIn, isGracePeriodOnly, isLoaded: authLoaded } = useAuth();
+  const { isSignedIn, isLoaded: authLoaded } = useAuth();
 
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const [needsReauth, setNeedsReauth] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [postOnboardingSettingsSection, setPostOnboardingSettingsSection] = useState(undefined);
+  const [postOnboardingSettingsSection] = useState(undefined);
 
   const isAgentPanel = window.location.search.includes("agent=true");
   const isControlPanel =
     !isAgentPanel &&
     (window.location.pathname.includes("control") || window.location.search.includes("panel=true"));
-  const isDictationPanel = !isControlPanel && !isAgentPanel;
 
   useEffect(() => {
     if (isAgentPanel) {
@@ -53,14 +51,12 @@ function MainApp() {
     } else if (isControlPanel) {
       import("./components/ControlPanel.tsx").catch(() => {});
 
-      if (!localStorage.getItem("onboardingCompleted")) {
-        import("./components/OnboardingFlow.tsx").catch(() => {});
-      }
+      localStorage.setItem("onboardingCompleted", "true");
     }
 
     // Sync runs in every non-agent window, so tray-only sessions where the
     // control panel is never opened still stay fresh.
-    if (!isAgentPanel) {
+    if (!isAgentPanel && !EGGHEADS_DICTATION_ONLY) {
       import("./services/SyncService.js")
         .then(({ syncService }) => syncService.startAutoSync())
         .catch(() => {});
@@ -70,44 +66,16 @@ function MainApp() {
   useEffect(() => {
     if (!authLoaded) return;
 
-    const onboardingCompleted = localStorage.getItem("onboardingCompleted") === "true";
-    const authSkipped =
-      localStorage.getItem("authenticationSkipped") === "true" ||
-      localStorage.getItem("skipAuth") === "true";
-    const onboardingInProgress = localStorage.getItem("onboardingCurrentStep") !== null;
-    const isReturningUser =
-      !onboardingCompleted && isSignedIn && !isGracePeriodOnly && !onboardingInProgress;
-
-    if (isReturningUser) {
-      localStorage.setItem("onboardingCompleted", "true");
-    }
-
-    const resolved = localStorage.getItem("onboardingCompleted") === "true";
+    localStorage.setItem("onboardingCompleted", "true");
+    localStorage.removeItem("authenticationSkipped");
+    localStorage.removeItem("skipAuth");
 
     if (isControlPanel) {
-      if (!resolved) {
-        setShowOnboarding(true);
-      } else if (!isSignedIn && !authSkipped) {
-        setNeedsReauth(true);
-      }
-    }
-
-    if (isDictationPanel && !resolved) {
-      // Keep the dictation overlay hidden during onboarding — OnboardingFlow
-      // shows it explicitly when the user reaches the activation step.
-      window.electronAPI?.hideWindow?.();
+      setNeedsReauth(!isSignedIn);
     }
 
     setIsLoading(false);
-  }, [authLoaded, isControlPanel, isDictationPanel, isGracePeriodOnly, isSignedIn]);
-
-  const handleOnboardingComplete = (options) => {
-    if (options?.openSettings) {
-      setPostOnboardingSettingsSection("transcription");
-    }
-    setShowOnboarding(false);
-    localStorage.setItem("onboardingCompleted", "true");
-  };
+  }, [authLoaded, isControlPanel, isSignedIn]);
 
   if (isAgentPanel) {
     return (
@@ -119,14 +87,6 @@ function MainApp() {
 
   if (isLoading) {
     return <LoadingFallback />;
-  }
-
-  if (isControlPanel && showOnboarding) {
-    return (
-      <Suspense fallback={<LoadingFallback />}>
-        <OnboardingFlow onComplete={handleOnboardingComplete} />
-      </Suspense>
-    );
   }
 
   if (isControlPanel && needsReauth) {
@@ -151,9 +111,7 @@ function MainApp() {
               <CardContent className="p-6">
                 <AuthenticationStep
                   onContinueWithoutAccount={() => {
-                    localStorage.setItem("authenticationSkipped", "true");
-                    localStorage.setItem("skipAuth", "true");
-                    setNeedsReauth(false);
+                    setNeedsReauth(true);
                   }}
                   onAuthComplete={() => setNeedsReauth(false)}
                   onNeedsVerification={() => {}}
