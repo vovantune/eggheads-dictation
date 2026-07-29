@@ -1,6 +1,6 @@
 # Planning Loop Delta Review Prompt
 
-Run Delta Review after the user changes an approved plan or implementation inputs change.
+Run Delta Review after the user changes an approved `full` plan or its implementation inputs change. For chat-only `light`, recompute Gate v2 instead of creating Delta Review artifacts.
 
 Compare the previous approved plan with the new request or diff.
 

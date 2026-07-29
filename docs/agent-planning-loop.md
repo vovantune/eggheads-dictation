@@ -2,7 +2,7 @@
 
 Этот документ описывает repo-native протокол планирования для задач, где важно получить не первую приличную идею, а выбранный synthesis после сравнения альтернатив по фактам, ограничениям и Definition of Done.
 
-Это не skill. Документ читается только после короткого Planning Loop Gate из активных project rules.
+Это не skill. Документ читается только после того, как effect-based classifier из `.ai-loop/gate-policy.json` выбрал `full`.
 
 Full XP Planning Loop обязателен только при доступных независимых agents/subagents/agent threads. Во всех рабочих средах проекта multiagent должен быть доступен. Если агент не может запустить независимых агентов, он обязан остановиться и сообщить пользователю, что full loop выполнить нельзя. Последовательное исполнение ролей одним агентом не является допустимым full loop и не должно маскироваться под независимое ревью.
 
@@ -12,76 +12,30 @@ Planning Loop использует общий `.ai-loop` runtime contract вме
 
 ## 0. Planning Loop Gate
 
-Сначала классифицируй задачу и выведи проверяемый gate:
+Gate вычисляется до чтения этого документа. Единственный portable source of truth — `.ai-loop/gate-policy.json`; контрастные regression cases находятся в `.ai-loop/gate-cases.json`. Имена файлов и слова `auth`, `provider`, `deployment`, `payload` или `session` сами по себе не являются triggers: классифицируй только фактические effects.
+
+Короткий gate output:
 
 ```text
 Planning Loop Gate: lightweight | light | full | blocked-no-subagents
-Hard triggers: present|absent|unknown — ...
-Soft triggers: N — ...
+Material hard effects: ...
+Boundary hard effects: ...
+Bounded change: yes|no — ...
+Independent risk groups: design, reach, runtime, proof_rollback
 Unknowns: ...
 Why not full: ...   # обязательно для lightweight/light
 ```
 
-### Lightweight
+Режимы:
 
-Используй `lightweight`, если задача маленькая и локальная:
+- `lightweight`: direct work, без subagents и artifacts;
+- `light`: компактный single-agent plan на 1–5 шагов и 1–3 focused checks, без council, `.ai-loop/runs`, `plans/...`, отдельного approval или clean-thread handoff;
+- `full`: текущий persisted multiagent protocol из этого документа;
+- `blocked-no-subagents`: только если policy выбрала `full`, но независимые agents/subagents недоступны.
 
-- не меняет API, DB/schema, deployment, auth, billing, security, provider, ops или UX contract;
-- не создает долгоживущий source of truth;
-- не имеет нескольких правдоподобных подходов;
-- не требует отдельного proof plan.
+Неизвестность сначала исследуется. Если после проверки остается возможный hard effect, задай blocking question или выбери `full`; остальные unknowns не становятся triggers или дополнительными risk groups.
 
-Для `lightweight` не читай этот full-loop reference дальше и не запускай subagents. Дай короткий план или сразу ответь в рамках режима.
-
-### Light
-
-Используй `light`, если задача средняя и полезно сравнить подходы, но нет hard-trigger для full loop.
-
-Требования:
-
-- собрать минимальный context pack;
-- сравнить минимум 2 подхода;
-- выбрать один подход по rubric;
-- показать rejected alternative и proof plan;
-- subagents использовать только если есть независимые ветки анализа.
-
-### Full
-
-`full` обязателен, если есть хотя бы один hard-trigger:
-
-- DB/schema/migration/ORM/generated docs;
-- public API, external contract, webhook, payload или backward compatibility;
-- deployment, auth, provider, billing, security или ops;
-- multi-repo или multi-service изменение;
-- риск data loss, money loss, privacy leak или сложный rollback.
-
-`full` также обязателен, если есть 2+ soft-trigger:
-
-- новая фича или архитектурное решение;
-- несколько правдоподобных подходов;
-- user-visible или operator-visible workflow;
-- unclear requirements или спорный source of truth;
-- performance/load-sensitive path;
-- высокий риск overengineering;
-- риск написать свое вместо reuse;
-- задача похожа на ранее проблемные кейсы: relay, scheduler, sync, session state, generated docs.
-
-Soft-trigger count учитывает только реальные продуктовые/технические риски. Мелкая локальная user-visible правка с ясным контрактом не становится `full` только из-за видимости пользователю; если есть сомнение, укажи `unknown` и выбери `full` или задай blocking question.
-
-Для `full` сначала прочитай весь этот документ, затем выполни полноценный multiagent loop.
-
-### Blocked: No Subagents
-
-Если gate требует `full`, но независимые agents/subagents недоступны, не выполняй single-agent simulation.
-
-Выведи:
-
-```text
-Planning Loop Gate: blocked-no-subagents
-Причина: full Planning Loop требует независимых agents/subagents, но текущая среда не дает их запустить.
-```
-
-После этого остановись и попроси пользователя открыть среду/режим с multiagent support. Не называй это fallback и не делай вид, что roles одного агента независимы.
+Остальные разделы этого документа относятся только к `full`.
 
 ## 0.1 Runtime Storage Contract
 
@@ -148,7 +102,7 @@ Approved plan artifact:
 plans/<task-slug>.md
 ```
 
-`light` и `full` Planning Loop не считается завершенным, пока пользователь не утвердил итоговый synthesis и approved plan не сохранен в `plans/<task-slug>.md`.
+`full` Planning Loop не считается завершенным, пока пользователь не утвердил итоговый synthesis и approved plan не сохранен в `plans/<task-slug>.md`.
 
 ## 0.2 JSON Validation
 
@@ -245,7 +199,7 @@ Alternatives должны быть materially distinct and feasible. Нельз�
 
 ## 3. Reviewers
 
-Для `light` reviewer checks может выполнить main orchestrator. Для `full` reviewer checks выполняют отдельные reviewer agents; main orchestrator не подменяет их последовательным roleplay.
+Для `full` reviewer checks выполняют отдельные reviewer agents; main orchestrator не подменяет их последовательным roleplay.
 
 Исключение допустимо только если reviewer не применим к задаче:
 
@@ -273,7 +227,7 @@ Assumptions допустимы только для неблокирующих д
 Final plan для upstream/provider/wire claims должен содержать `Evidence Register`:
 
 | Claim | Source URL/path | Date checked | Version/endpoint/model | Exact evidence used |
-| --- | --- | --- | --- | --- |
+| ----- | --------------- | ------------ | ---------------------- | ------------------- |
 
 ### Reviewer 3: Project DoD
 
@@ -283,16 +237,16 @@ Final plan для upstream/provider/wire claims должен содержать 
 
 Blocking DoD matrix:
 
-| Change type | Required in final plan |
-| --- | --- |
-| Electron main/preload/IPC contract | preload bridge compatibility, IPC handler tests/manual checks, renderer failure behavior |
-| Renderer UX/i18n | locale keys for all supported languages, `npm run i18n:check`, observable UX result |
-| Public API/external payload/webhook | contract compatibility, request/response docs/tests, negative cases |
-| DB/schema/vector index/local storage | migration/backward compatibility, focused database tests, data-loss negative cases |
-| Native sidecar/bundled binary | build/download script wiring, sidecar registry/pid cleanup, platform-specific fallback |
-| Provider/quota/pricing/limits/auth/wire protocol | External Provider Evidence, headers/body/stream contract, failure semantics |
-| Relay/network/egress/header transparency | proof of exact network/header behavior, negative case proving the old failure is caught |
-| Scheduler/sync/session state/async status | source of truth, idempotency, observable marker, retry/failure semantics |
+| Change type                                      | Required in final plan                                                                   |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| Electron main/preload/IPC contract               | preload bridge compatibility, IPC handler tests/manual checks, renderer failure behavior |
+| Renderer UX/i18n                                 | locale keys for all supported languages, `npm run i18n:check`, observable UX result      |
+| Public API/external payload/webhook              | contract compatibility, request/response docs/tests, negative cases                      |
+| DB/schema/vector index/local storage             | migration/backward compatibility, focused database tests, data-loss negative cases       |
+| Native sidecar/bundled binary                    | build/download script wiring, sidecar registry/pid cleanup, platform-specific fallback   |
+| Provider/quota/pricing/limits/auth/wire protocol | External Provider Evidence, headers/body/stream contract, failure semantics              |
+| Relay/network/egress/header transparency         | proof of exact network/header behavior, negative case proving the old failure is caught  |
+| Scheduler/sync/session state/async status        | source of truth, idempotency, observable marker, retry/failure semantics                 |
 
 ## 4. Council Synthesis
 
@@ -358,7 +312,7 @@ Council must produce a score table for the chosen approach and rejected alternat
 Proof plan должен быть матрицей, а не списком команд:
 
 | Claim | Exact assertion | Command/test/manual check | Fixture/input | Negative case | Failure mode caught |
-| --- | --- | --- | --- | --- | --- |
+| ----- | --------------- | ------------------------- | ------------- | ------------- | ------------------- |
 
 Для relay/provider/scheduler/sync/session-state задач хотя бы один proof должен доказывать именно критический риск, а не только routing/syntax/happy path.
 
@@ -440,7 +394,7 @@ Programming Loop при старте копирует approved plan в `input/ap
 
 Planning Loop считается рабочим, если выполняются критерии:
 
-- `light` и `full` планы содержат competing approaches, выбранный подход и rejected alternatives.
+- `full` планы содержат competing approaches, выбранный подход и rejected alternatives.
 - Финальный выбор ссылается на факты и rubric, а не на "кажется лучше".
 - High-risk задачи содержат proof plan, failure semantics и rollback/reversibility.
 - План не предлагает менять исходники библиотек/зависимостей без явного approval.
@@ -454,25 +408,34 @@ Planning Loop считается рабочим, если выполняются
 
 Минимальная dry-run матрица:
 
-| Prompt | Expected |
-| --- | --- |
-| "Переименуй локальную переменную" | `lightweight`, no full docs, no subagents |
-| "Спланируй миграцию auth" | `full`, subagents, alternatives, non-goals, proof plan, DoD |
-| "Не используй subagents, но спланируй DB/API изменение" | `blocked-no-subagents` |
-| "Что за план на сегодня?" | no full protocol unless technical planning intent is clear |
-| "Сделай UX-visible статус автосессий" | `full` by default; `light` only for purely local UI label with proven existing source of truth |
-| "Backend-only infra relay change" | Ops included, UX skipped unless operator-visible |
-| "После правки плана убери поле X" | Delta Review only for affected scope |
-| "Спланируй scheduler/sync/session-state workflow" | `full` by default; `light` only for explicitly local fix with proven single source of truth |
-| "Спланируй relay egress/header transparency" | `full`, proof matrix catches exact egress/header behavior and negative case |
-| "Спланируй provider/quota без official evidence" | `full` then blocked or explicit blocking question until External Provider Evidence exists |
-| "Добавь session marker" | `full` unless purely local UI label; plan proves marker is not second source of truth |
+| Prompt                                                        | Expected                                                                                  |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| "Переименуй локальную переменную"                             | `lightweight`, no full docs, no subagents                                                 |
+| "Исправь текст ошибки auth, не меняя validation"              | `lightweight`, keyword `auth` не является trigger                                         |
+| "Исправь provider display label"                              | `lightweight`, routing/model identity не меняются                                         |
+| "Исправь quota label из существующего source of truth"        | `light`, compact plan и focused proof без artifacts                                       |
+| "Измени timeout одного локального процесса"                   | `light`, если runtime owner и rollback локальны                                           |
+| "Переименуй internal payload внутри одного runtime unit"      | `light`, если все consumers локальны и public contract сохранен                           |
+| "Спланируй миграцию auth"                                     | `full`, subagents, alternatives, non-goals, proof plan, DoD                               |
+| "Измени token validation или tenant isolation"                | `full`, executable security semantics                                                     |
+| "Измени provider routing/model identity"                      | `full`, boundary hard effect                                                              |
+| "Переименуй поле public API/webhook payload"                  | `full`, external contract                                                                 |
+| "Измени deployment topology/rolling strategy"                 | `full`, production rollout boundary                                                       |
+| "Не используй subagents, но спланируй DB/API изменение"       | `blocked-no-subagents`                                                                    |
+| "Что за план на сегодня?"                                     | no full protocol unless technical planning intent is clear                                |
+| "Сделай локальный UI label из готового state"                 | `lightweight` или `light` по независимым risk groups, а не по user-visible keyword        |
+| "Backend-only infra relay change"                             | Ops included, UX skipped unless operator-visible                                          |
+| "После правки плана убери поле X"                             | Delta Review only for affected scope                                                      |
+| "Исправь локальный session-state bug с одним source of truth" | `light`; coordinated cross-service state остается `full`                                  |
+| "Спланируй relay egress/header transparency"                  | `full`, proof matrix catches exact egress/header behavior and negative case               |
+| "Спланируй provider/quota без official evidence"              | `full` then blocked or explicit blocking question until External Provider Evidence exists |
+| "Добавь cross-service session marker"                         | `full`; plan proves marker is not second source of truth                                  |
 
 Dry-run verification contract:
 
 - `lightweight` pass: transcript содержит gate `lightweight`; нет чтения `docs/agent-planning-loop.md`; нет spawn/send/wait subagent tool calls; ответ короткий.
-- `light` pass: transcript содержит gate `light`; нет чтения `docs/agent-planning-loop.md`; есть минимум 2 competing approaches, выбранный подход, rejected alternative и proof plan.
+- `light` pass: transcript содержит gate `light`; нет чтения `docs/agent-planning-loop.md`; есть compact plan на 1–5 шагов и 1–3 focused checks; нет council, `.ai-loop/runs`, `plans/...`, отдельного approval или handoff.
 - `full` pass: transcript содержит gate `full`; после gate есть чтение `docs/agent-planning-loop.md`; есть отдельные subagent/agent-thread calls для planners и reviewer agents; final plan содержит synthesis, а не только список мнений.
 - `blocked-no-subagents` pass: transcript содержит gate `blocked-no-subagents`; нет roleplay planners/reviewers; агент останавливается и объясняет, что full loop требует независимых agents/subagents.
-- repo-native artifact pass: successful `light`/`full` planning создает или называет `plans/...` artifact с итоговым synthesis; `blocked-no-subagents` не создает plan-файл.
+- repo-native artifact pass: successful `full` planning создает или называет `plans/...` artifact с итоговым synthesis; `lightweight`, `light` и `blocked-no-subagents` не создают plan-файл.
 - Delta Review pass: transcript называет changed scope, затронутые roles/checks и impact; full loop повторяется при смене основного подхода, source of truth, public/external contract, DB/API/generated docs, provider evidence или critical proof gate.

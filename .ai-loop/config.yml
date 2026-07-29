@@ -1,5 +1,6 @@
 version: 1
 runtime_contract: universal-chat-native-loop
+planning_gate_policy: 2
 
 storage:
   root: .ai-loop
@@ -20,6 +21,8 @@ loop_types:
 
   planning:
     document: docs/agent-planning-loop.md
+    gate_policy: .ai-loop/gate-policy.json
+    gate_cases: .ai-loop/gate-cases.json
     state_schema: .ai-loop/schemas/loop-state.schema.json
     planner_schema: .ai-loop/schemas/planning-result.schema.json
     reviewer_schema: .ai-loop/schemas/planning-review-result.schema.json

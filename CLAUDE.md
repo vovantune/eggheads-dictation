@@ -48,16 +48,18 @@ OpenWhispr is an Electron-based desktop dictation application that uses whisper.
 ## Source of Truth
 
 - `CLAUDE.md` is the canonical assistant entrypoint for this repository; `AGENTS.md` is a compatibility symlink to it.
-- Detailed Planning/Programming Loop protocols live in `docs/agent-planning-loop.md`, `docs/agent-programming-loop.md`, and `.ai-loop/config.yml`.
-- Runtime loop artifacts go under ignored `.ai-loop/runs/`; approved `light`/`full` plans go under `plans/<task-slug>.md`.
+- Portable Planning Loop classification is defined by `.ai-loop/gate-policy.json`; `.ai-loop/gate-cases.json` is a test fixture, not required runtime context.
+- Detailed full Planning/Programming Loop protocols live in `docs/agent-planning-loop.md`, `docs/agent-programming-loop.md`, and `.ai-loop/config.yml`.
+- Runtime loop artifacts go under ignored `.ai-loop/runs/`; approved `full` plans go under `plans/<task-slug>.md`.
 
 ## Plan Mode: XP Planning Loop
 
-- If the current session is in Plan Mode (`/plan`, developer Plan Mode) or the user explicitly asks to plan a technical task, use `docs/agent-planning-loop.md` and `.ai-loop/config.yml`.
-- Planning Loop Gate chooses `lightweight`, `light`, `full`, or `blocked-no-subagents`; full protocol, schemas, prompts, artifacts, and handoff are described only in `docs/agent-planning-loop.md`.
-- In Default/Code/Ask/Debug mode before implementation, compute the same gate. If the computed gate requires `light`/`full`, an approved plan for the current scope is required; if no suitable plan exists or it is stale, stop before edits and offer Planning Loop or Delta Review.
-- After approval of a `light`/`full` plan, save the approved plan in `plans/<task-slug>.md`. If a clean session/thread is unavailable, show the handoff prompt from runtime artifacts and do not start implementation in polluted planning context.
-- If an incoming message starts with `PLEASE IMPLEMENT THIS PLAN:`, treat it as a Codex plan-button approval event. Run Planning -> Programming handoff from `docs/agent-planning-loop.md`: save the approved plan and handoff artifacts, run Programming Loop preflight, then start a clean session/thread or fail closed with the handoff prompt; do not start coding in the current planning thread.
+- In Plan Mode (`/plan`, developer Plan Mode), when the user explicitly asks to plan a technical task, and before implementation in Default/Code/Ask/Debug mode, compute the Planning Loop Gate from `.ai-loop/gate-policy.json`.
+- `lightweight` means direct work without subagents or loop artifacts. `light` means a compact single-agent plan with focused proof, without council, `.ai-loop/runs`, `plans/...`, or clean-thread handoff. If the user already asked to implement, `light` does not require repeated approval.
+- Only `full` uses `docs/agent-planning-loop.md`, independent planners/reviewers, persisted artifacts, user approval, and Planning -> Programming handoff.
+- If `full` is required and an approved plan for the current scope is absent or stale, stop before edits and offer the full Planning Loop or Delta Review. If independent subagents are unavailable, report `blocked-no-subagents`.
+- After approval of a `full` plan, save it in `plans/<task-slug>.md`. If a clean session/thread is unavailable, show the handoff prompt from runtime artifacts and do not start implementation in polluted planning context.
+- If an incoming message starts with `PLEASE IMPLEMENT THIS PLAN:`, classify the approved scope through Gate v2. For `light`, it is permission to implement in the current thread without artifacts or handoff. For `full`, treat it as a Codex plan-button approval event: run Planning -> Programming handoff from `docs/agent-planning-loop.md`, save the approved plan and handoff artifacts, run Programming Loop preflight, then start a clean session/thread or fail closed with the handoff prompt; do not start coding in the current planning thread.
 
 ## Agent Workflow
 
@@ -457,11 +459,12 @@ The app can open OS-level settings for microphone permissions, sound input selec
 - `open-accessibility-settings`: Opens accessibility privacy settings (macOS only)
 
 **Platform-specific URLs**:
-| Platform | Microphone Privacy | Sound Input | Accessibility |
-|----------|-------------------|-------------|---------------|
-| macOS | `x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone` | `x-apple.systempreferences:com.apple.preference.sound?input` | `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility` |
-| Windows | `ms-settings:privacy-microphone` | `ms-settings:sound` | N/A |
-| Linux | Manual (no URL scheme) | Manual (e.g., pavucontrol) | N/A |
+
+| Platform | Microphone Privacy                                                           | Sound Input                                                  | Accessibility                                                                   |
+| -------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| macOS    | `x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone` | `x-apple.systempreferences:com.apple.preference.sound?input` | `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility` |
+| Windows  | `ms-settings:privacy-microphone`                                             | `ms-settings:sound`                                          | N/A                                                                             |
+| Linux    | Manual (no URL scheme)                                                       | Manual (e.g., pavucontrol)                                   | N/A                                                                             |
 
 **UI Component** (`MicPermissionWarning.tsx`):
 
