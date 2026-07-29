@@ -1,0 +1,71 @@
+{
+  "version": 2,
+  "name": "effect-based-planning-gate",
+  "classification_order": [
+    "material_or_boundary_hard_effect_present_or_unresolved",
+    "bounded_change",
+    "independent_risk_group_threshold",
+    "direct_work"
+  ],
+  "hard_effects": {
+    "material": {
+      "persisted_state_schema": "Changes a database, migration, schema, generated state contract, or other persisted-state semantics.",
+      "public_external_contract": "Changes a public API, external payload, webhook, wire contract, or backward-compatibility guarantee.",
+      "executable_auth_security_privacy": "Changes executable authentication, authorization, security, secret handling, or privacy enforcement.",
+      "billing_accounting": "Changes billing, charging, quota accounting, balances, pricing, or money semantics.",
+      "destructive_data_money_privacy": "Introduces a credible data-loss, money-loss, privacy-leak, or destructive-operation risk."
+    },
+    "boundary": {
+      "provider_routing_wire_model_identity": "Changes provider routing, provider wire behavior, externally meaningful model identity, or selection ownership.",
+      "deployment_topology_production_rollout_runtime_ownership": "Changes deployment topology, production rollout behavior, process placement, or runtime ownership.",
+      "coordinated_cross_service_state": "Requires coordinated state or contract changes across services or repositories.",
+      "complex_rollback": "Cannot be reverted locally without coordinated migration, rollout, or state repair."
+    }
+  },
+  "bounded_change": {
+    "required_facts": [
+      "single_runtime_owner",
+      "existing_source_of_truth",
+      "preserves_external_and_state_contracts",
+      "preserves_security_accounting_and_routing",
+      "local_rollback_and_focused_proof"
+    ],
+    "effect": "When every required fact is proven and no hard effect is present or unresolved, cap the gate at light."
+  },
+  "risk_groups": {
+    "design": "Material solution ambiguity, a new feature boundary, or an architectural decision.",
+    "reach": "User/operator workflow or multi-module reach that is broader than a local presentation change.",
+    "runtime": "Performance, load, async, scheduler, sync, session-state, relay, or degraded-runtime behavior.",
+    "proof_rollback": "The critical behavior is difficult to prove locally or rollback is not a direct bounded revert."
+  },
+  "thresholds": {
+    "full_min_independent_risk_groups": 3
+  },
+  "unknowns": {
+    "rule": "Inspect repository evidence first. An unresolved possible hard effect requires a blocking question or full; other unknowns do not become extra risk groups."
+  },
+  "gates": {
+    "lightweight": {
+      "requirements": "No present or unresolved hard effect, direct work, and no independent risk group.",
+      "workflow": "Implement or answer directly; no subagents, council, run artifacts, approved-plan artifact, or handoff."
+    },
+    "light": {
+      "requirements": "No present or unresolved hard effect and either a proven bounded change or one to two independent risk groups.",
+      "workflow": "Use a compact single-agent approach and focused proof/rollback in chat; no council, run artifacts, approved-plan artifact, or handoff."
+    },
+    "full": {
+      "requirements": "Any present or unresolved hard effect, or at least three independent risk groups when the bounded-change cap is not proven.",
+      "workflow": "Use the persisted multiagent Planning Loop, user-approved plan, and Planning to Programming handoff."
+    },
+    "blocked-no-subagents": {
+      "requirements": "The classified gate is full and independent subagents are unavailable.",
+      "workflow": "Stop without simulating independent roles."
+    }
+  },
+  "constraints": [
+    "Classify effects, not keywords, filenames, repository names, or task labels.",
+    "Lines changed are not a standalone signal.",
+    "Provider-adjacent copy, labels, docs, metadata, and local config are not hard effects unless their executable contract changes.",
+    "Correlated concerns count once in their risk group."
+  ]
+}

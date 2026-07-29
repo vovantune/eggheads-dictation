@@ -1,0 +1,220 @@
+{
+  "version": 1,
+  "policy_version": 2,
+  "cases": [
+    {
+      "id": "auth-copy-only",
+      "summary": "Clarify static authentication help copy without changing executable validation or credentials.",
+      "hard_effects": [],
+      "unknown_hard_effects": [],
+      "bounded_facts": [
+        "single_runtime_owner",
+        "existing_source_of_truth",
+        "preserves_external_and_state_contracts",
+        "preserves_security_accounting_and_routing",
+        "local_rollback_and_focused_proof"
+      ],
+      "risk_groups": [],
+      "direct_work": true,
+      "expected_gate": "lightweight"
+    },
+    {
+      "id": "provider-label-only",
+      "summary": "Correct a local provider label while preserving routing, wire behavior, model identity, and payload shape.",
+      "hard_effects": [],
+      "unknown_hard_effects": [],
+      "bounded_facts": [
+        "single_runtime_owner",
+        "existing_source_of_truth",
+        "preserves_external_and_state_contracts",
+        "preserves_security_accounting_and_routing",
+        "local_rollback_and_focused_proof"
+      ],
+      "risk_groups": [],
+      "direct_work": true,
+      "expected_gate": "lightweight"
+    },
+    {
+      "id": "docs-typo",
+      "summary": "Fix a documentation typo without changing a generated or executable contract.",
+      "hard_effects": [],
+      "unknown_hard_effects": [],
+      "bounded_facts": [
+        "single_runtime_owner",
+        "existing_source_of_truth",
+        "preserves_external_and_state_contracts",
+        "preserves_security_accounting_and_routing",
+        "local_rollback_and_focused_proof"
+      ],
+      "risk_groups": [],
+      "direct_work": true,
+      "expected_gate": "lightweight"
+    },
+    {
+      "id": "quota-window-label",
+      "summary": "Derive a user-visible quota label from an existing canonical duration without changing accounting or payload shape.",
+      "hard_effects": [],
+      "unknown_hard_effects": [],
+      "bounded_facts": [
+        "single_runtime_owner",
+        "existing_source_of_truth",
+        "preserves_external_and_state_contracts",
+        "preserves_security_accounting_and_routing",
+        "local_rollback_and_focused_proof"
+      ],
+      "risk_groups": ["reach"],
+      "direct_work": false,
+      "expected_gate": "light"
+    },
+    {
+      "id": "deployment-timeout-local-config",
+      "summary": "Adjust an existing service timeout without changing topology, production rollout, or runtime ownership.",
+      "hard_effects": [],
+      "unknown_hard_effects": [],
+      "bounded_facts": [
+        "single_runtime_owner",
+        "existing_source_of_truth",
+        "preserves_external_and_state_contracts",
+        "preserves_security_accounting_and_routing",
+        "local_rollback_and_focused_proof"
+      ],
+      "risk_groups": ["runtime", "proof_rollback"],
+      "direct_work": false,
+      "expected_gate": "light"
+    },
+    {
+      "id": "internal-payload-normalization",
+      "summary": "Normalize an internal payload while preserving every public and cross-service contract.",
+      "hard_effects": [],
+      "unknown_hard_effects": [],
+      "bounded_facts": [
+        "single_runtime_owner",
+        "existing_source_of_truth",
+        "preserves_external_and_state_contracts",
+        "preserves_security_accounting_and_routing",
+        "local_rollback_and_focused_proof"
+      ],
+      "risk_groups": ["design", "proof_rollback"],
+      "direct_work": false,
+      "expected_gate": "light"
+    },
+    {
+      "id": "local-session-state-fix",
+      "summary": "Fix local session presentation using the existing state owner without changing persisted or external session contracts.",
+      "hard_effects": [],
+      "unknown_hard_effects": [],
+      "bounded_facts": [
+        "single_runtime_owner",
+        "existing_source_of_truth",
+        "preserves_external_and_state_contracts",
+        "preserves_security_accounting_and_routing",
+        "local_rollback_and_focused_proof"
+      ],
+      "risk_groups": ["reach", "runtime"],
+      "direct_work": false,
+      "expected_gate": "light"
+    },
+    {
+      "id": "bounded-change-over-threshold",
+      "summary": "Keep a cross-cutting local change at light when every bounded fact is proven despite four correlated risk groups.",
+      "hard_effects": [],
+      "unknown_hard_effects": [],
+      "bounded_facts": [
+        "single_runtime_owner",
+        "existing_source_of_truth",
+        "preserves_external_and_state_contracts",
+        "preserves_security_accounting_and_routing",
+        "local_rollback_and_focused_proof"
+      ],
+      "risk_groups": ["design", "reach", "runtime", "proof_rollback"],
+      "direct_work": false,
+      "expected_gate": "light"
+    },
+    {
+      "id": "hard-effect-over-bounded-cap",
+      "summary": "Keep an executable authentication change at full even when every bounded fact is otherwise proven.",
+      "hard_effects": ["executable_auth_security_privacy"],
+      "unknown_hard_effects": [],
+      "bounded_facts": [
+        "single_runtime_owner",
+        "existing_source_of_truth",
+        "preserves_external_and_state_contracts",
+        "preserves_security_accounting_and_routing",
+        "local_rollback_and_focused_proof"
+      ],
+      "risk_groups": [],
+      "direct_work": false,
+      "expected_gate": "full"
+    },
+    {
+      "id": "database-migration",
+      "summary": "Add a database migration that changes persisted state.",
+      "hard_effects": ["persisted_state_schema"],
+      "unknown_hard_effects": [],
+      "bounded_facts": [],
+      "risk_groups": ["design", "proof_rollback"],
+      "direct_work": false,
+      "expected_gate": "full"
+    },
+    {
+      "id": "auth-validation",
+      "summary": "Change executable authentication validation.",
+      "hard_effects": ["executable_auth_security_privacy"],
+      "unknown_hard_effects": [],
+      "bounded_facts": [],
+      "risk_groups": ["runtime"],
+      "direct_work": false,
+      "expected_gate": "full"
+    },
+    {
+      "id": "provider-routing",
+      "summary": "Change provider routing and externally meaningful model selection.",
+      "hard_effects": ["provider_routing_wire_model_identity"],
+      "unknown_hard_effects": [],
+      "bounded_facts": [],
+      "risk_groups": ["design", "runtime"],
+      "direct_work": false,
+      "expected_gate": "full"
+    },
+    {
+      "id": "public-payload",
+      "summary": "Change a public API response payload.",
+      "hard_effects": ["public_external_contract"],
+      "unknown_hard_effects": [],
+      "bounded_facts": [],
+      "risk_groups": ["reach", "proof_rollback"],
+      "direct_work": false,
+      "expected_gate": "full"
+    },
+    {
+      "id": "deployment-topology",
+      "summary": "Change production deployment topology and runtime ownership.",
+      "hard_effects": ["deployment_topology_production_rollout_runtime_ownership"],
+      "unknown_hard_effects": [],
+      "bounded_facts": [],
+      "risk_groups": ["runtime", "proof_rollback"],
+      "direct_work": false,
+      "expected_gate": "full"
+    },
+    {
+      "id": "cross-cutting-feature",
+      "summary": "Add a non-bounded feature with independent design, reach, and runtime risks.",
+      "hard_effects": [],
+      "unknown_hard_effects": [],
+      "bounded_facts": [],
+      "risk_groups": ["design", "reach", "runtime"],
+      "direct_work": false,
+      "expected_gate": "full"
+    },
+    {
+      "id": "unknown-auth-effect",
+      "summary": "The repository evidence cannot determine whether authentication enforcement changes.",
+      "hard_effects": [],
+      "unknown_hard_effects": ["executable_auth_security_privacy"],
+      "bounded_facts": [],
+      "risk_groups": ["proof_rollback"],
+      "direct_work": false,
+      "expected_gate": "full"
+    }
+  ]
+}
