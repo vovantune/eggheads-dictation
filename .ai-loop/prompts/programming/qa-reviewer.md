@@ -30,7 +30,8 @@ Return:
 
 Gate rule:
 
-- Any unresolved `blocker`, `critical`, or `major` finding means `verdict: "fail"`.
+- Any unresolved severity listed by canonical `gate.fail_on_severity` means `verdict: "fail"`; the default list is `blocker`, `critical`, `major`.
 - Use `verdict: "needs_human"` only when the next step requires user approval or a scope decision.
-- Use `verdict: "pass"` only when plan coverage is complete and no important findings remain.
+- Use `verdict: "pass"` when plan coverage is complete and no gate-blocking findings remain. Unresolved `minor`/`nit` may remain in the report and do not by themselves trigger a fixer.
+- A passing report does not need to say that no findings were found.
 - If QA JSON cannot satisfy the schema, do not return `pass`; return `failed_runtime` in the subagent-result JSON and explain why.

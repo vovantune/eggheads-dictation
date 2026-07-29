@@ -3,7 +3,11 @@
   "$id": "https://eggheads.local/ai-loop/planning-final-result.schema.json",
   "title": "Planning Loop Final Result",
   "type": "object",
-  "required": ["schema_version", "gate", "status"],
+  "required": [
+    "schema_version",
+    "gate",
+    "status"
+  ],
   "additionalProperties": false,
   "properties": {
     "schema_version": { "const": 1 },
@@ -93,16 +97,10 @@
           "proof_plan"
         ],
         "properties": {
-          "implementation_slices": {
-            "maxItems": 5
-          },
-          "proof_plan": {
-            "maxItems": 3
-          }
+          "implementation_slices": { "maxItems": 5 },
+          "proof_plan": { "maxItems": 3 }
         },
-        "not": {
-          "required": ["handoff"]
-        }
+        "not": { "required": ["handoff"] }
       }
     },
     {
@@ -114,10 +112,10 @@
         "required": ["status", "gate"]
       },
       "then": {
-        "required": ["recommended_approach"],
-        "not": {
-          "required": ["handoff"]
-        }
+        "required": [
+          "recommended_approach"
+        ],
+        "not": { "required": ["handoff"] }
       }
     },
     {

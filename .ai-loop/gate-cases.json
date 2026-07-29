@@ -1,220 +1,440 @@
 {
-  "version": 1,
-  "policy_version": 2,
+  "version": 3,
+  "policy_version": 3,
   "cases": [
     {
-      "id": "auth-copy-only",
-      "summary": "Clarify static authentication help copy without changing executable validation or credentials.",
-      "hard_effects": [],
-      "unknown_hard_effects": [],
-      "bounded_facts": [
-        "single_runtime_owner",
-        "existing_source_of_truth",
-        "preserves_external_and_state_contracts",
-        "preserves_security_accounting_and_routing",
-        "local_rollback_and_focused_proof"
-      ],
-      "risk_groups": [],
-      "direct_work": true,
-      "expected_gate": "lightweight"
-    },
-    {
-      "id": "provider-label-only",
-      "summary": "Correct a local provider label while preserving routing, wire behavior, model identity, and payload shape.",
-      "hard_effects": [],
-      "unknown_hard_effects": [],
-      "bounded_facts": [
-        "single_runtime_owner",
-        "existing_source_of_truth",
-        "preserves_external_and_state_contracts",
-        "preserves_security_accounting_and_routing",
-        "local_rollback_and_focused_proof"
-      ],
-      "risk_groups": [],
-      "direct_work": true,
-      "expected_gate": "lightweight"
-    },
-    {
       "id": "docs-typo",
-      "summary": "Fix a documentation typo without changing a generated or executable contract.",
+      "summary": "Fix an ordinary documentation typo.",
       "hard_effects": [],
-      "unknown_hard_effects": [],
-      "bounded_facts": [
-        "single_runtime_owner",
-        "existing_source_of_truth",
-        "preserves_external_and_state_contracts",
-        "preserves_security_accounting_and_routing",
-        "local_rollback_and_focused_proof"
-      ],
+      "unresolved_effects": [],
+      "bounded_facts": ["single_runtime_owner", "existing_source_of_truth", "preserves_external_and_state_contracts", "preserves_security_accounting_and_routing", "local_rollback_and_focused_proof"],
       "risk_groups": [],
       "direct_work": true,
-      "expected_gate": "lightweight"
+      "request_mode": "ordinary",
+      "execution_facts": {"independence_need": "none", "resolved_full_planning_to_local_fix": false},
+      "proof_signal": "static",
+      "expected": {"planning": "lightweight", "programming": "direct", "proof": "static", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
     },
     {
-      "id": "quota-window-label",
-      "summary": "Derive a user-visible quota label from an existing canonical duration without changing accounting or payload shape.",
+      "id": "simple-explicit-programming-loop",
+      "summary": "Perform a simple bounded task with an explicit Programming Loop request.",
       "hard_effects": [],
-      "unknown_hard_effects": [],
-      "bounded_facts": [
-        "single_runtime_owner",
-        "existing_source_of_truth",
-        "preserves_external_and_state_contracts",
-        "preserves_security_accounting_and_routing",
-        "local_rollback_and_focused_proof"
-      ],
+      "unresolved_effects": [],
+      "bounded_facts": ["single_runtime_owner", "existing_source_of_truth", "preserves_external_and_state_contracts", "preserves_security_accounting_and_routing", "local_rollback_and_focused_proof"],
+      "risk_groups": [],
+      "direct_work": true,
+      "request_mode": "programming-loop",
+      "execution_facts": {"independence_need": "none", "resolved_full_planning_to_local_fix": false},
+      "proof_signal": "focused",
+      "expected": {"planning": "lightweight", "programming": "light", "proof": "focused", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
+    },
+    {
+      "id": "php-controller-bug-no-contract-change",
+      "summary": "Fix a controller implementation bug without changing payload or persisted semantics.",
+      "hard_effects": [],
+      "unresolved_effects": [],
+      "bounded_facts": ["single_runtime_owner", "existing_source_of_truth", "preserves_external_and_state_contracts", "preserves_security_accounting_and_routing", "local_rollback_and_focused_proof"],
       "risk_groups": ["reach"],
       "direct_work": false,
-      "expected_gate": "light"
+      "request_mode": "programming-loop",
+      "execution_facts": {"independence_need": "independent_review", "resolved_full_planning_to_local_fix": false},
+      "proof_signal": "focused",
+      "expected": {"planning": "light", "programming": "light", "proof": "focused", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
     },
     {
-      "id": "deployment-timeout-local-config",
-      "summary": "Adjust an existing service timeout without changing topology, production rollout, or runtime ownership.",
+      "id": "sql-orm-bug-bounded",
+      "summary": "Fix a SQL or ORM query bug with unchanged schema, payload, transaction, and persisted semantics.",
       "hard_effects": [],
-      "unknown_hard_effects": [],
-      "bounded_facts": [
-        "single_runtime_owner",
-        "existing_source_of_truth",
-        "preserves_external_and_state_contracts",
-        "preserves_security_accounting_and_routing",
-        "local_rollback_and_focused_proof"
-      ],
-      "risk_groups": ["runtime", "proof_rollback"],
-      "direct_work": false,
-      "expected_gate": "light"
-    },
-    {
-      "id": "internal-payload-normalization",
-      "summary": "Normalize an internal payload while preserving every public and cross-service contract.",
-      "hard_effects": [],
-      "unknown_hard_effects": [],
-      "bounded_facts": [
-        "single_runtime_owner",
-        "existing_source_of_truth",
-        "preserves_external_and_state_contracts",
-        "preserves_security_accounting_and_routing",
-        "local_rollback_and_focused_proof"
-      ],
-      "risk_groups": ["design", "proof_rollback"],
-      "direct_work": false,
-      "expected_gate": "light"
-    },
-    {
-      "id": "local-session-state-fix",
-      "summary": "Fix local session presentation using the existing state owner without changing persisted or external session contracts.",
-      "hard_effects": [],
-      "unknown_hard_effects": [],
-      "bounded_facts": [
-        "single_runtime_owner",
-        "existing_source_of_truth",
-        "preserves_external_and_state_contracts",
-        "preserves_security_accounting_and_routing",
-        "local_rollback_and_focused_proof"
-      ],
-      "risk_groups": ["reach", "runtime"],
-      "direct_work": false,
-      "expected_gate": "light"
-    },
-    {
-      "id": "bounded-change-over-threshold",
-      "summary": "Keep a cross-cutting local change at light when every bounded fact is proven despite four correlated risk groups.",
-      "hard_effects": [],
-      "unknown_hard_effects": [],
-      "bounded_facts": [
-        "single_runtime_owner",
-        "existing_source_of_truth",
-        "preserves_external_and_state_contracts",
-        "preserves_security_accounting_and_routing",
-        "local_rollback_and_focused_proof"
-      ],
-      "risk_groups": ["design", "reach", "runtime", "proof_rollback"],
-      "direct_work": false,
-      "expected_gate": "light"
-    },
-    {
-      "id": "hard-effect-over-bounded-cap",
-      "summary": "Keep an executable authentication change at full even when every bounded fact is otherwise proven.",
-      "hard_effects": ["executable_auth_security_privacy"],
-      "unknown_hard_effects": [],
-      "bounded_facts": [
-        "single_runtime_owner",
-        "existing_source_of_truth",
-        "preserves_external_and_state_contracts",
-        "preserves_security_accounting_and_routing",
-        "local_rollback_and_focused_proof"
-      ],
-      "risk_groups": [],
-      "direct_work": false,
-      "expected_gate": "full"
-    },
-    {
-      "id": "database-migration",
-      "summary": "Add a database migration that changes persisted state.",
-      "hard_effects": ["persisted_state_schema"],
-      "unknown_hard_effects": [],
-      "bounded_facts": [],
-      "risk_groups": ["design", "proof_rollback"],
-      "direct_work": false,
-      "expected_gate": "full"
-    },
-    {
-      "id": "auth-validation",
-      "summary": "Change executable authentication validation.",
-      "hard_effects": ["executable_auth_security_privacy"],
-      "unknown_hard_effects": [],
-      "bounded_facts": [],
+      "unresolved_effects": [],
+      "bounded_facts": ["single_runtime_owner", "existing_source_of_truth", "preserves_external_and_state_contracts", "preserves_security_accounting_and_routing", "local_rollback_and_focused_proof"],
       "risk_groups": ["runtime"],
       "direct_work": false,
-      "expected_gate": "full"
+      "request_mode": "programming-loop",
+      "execution_facts": {"independence_need": "independent_review", "resolved_full_planning_to_local_fix": false},
+      "proof_signal": "focused",
+      "expected": {"planning": "light", "programming": "light", "proof": "focused", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
     },
     {
-      "id": "provider-routing",
-      "summary": "Change provider routing and externally meaningful model selection.",
+      "id": "additive-nullable-column-bounded",
+      "summary": "Add a nullable column with no backfill, material lock, cross-version risk, or external consumer.",
+      "hard_effects": [],
+      "unresolved_effects": [],
+      "bounded_facts": ["single_runtime_owner", "existing_source_of_truth", "preserves_external_and_state_contracts", "preserves_security_accounting_and_routing", "local_rollback_and_focused_proof"],
+      "risk_groups": ["runtime", "proof_rollback"],
+      "direct_work": false,
+      "request_mode": "programming-loop",
+      "execution_facts": {"independence_need": "separation_of_duties", "resolved_full_planning_to_local_fix": false},
+      "proof_signal": "contract",
+      "expected": {"planning": "light", "programming": "guarded", "proof": "contract", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
+    },
+    {
+      "id": "bounded-sentry-env-wrapper",
+      "summary": "Repair local Sentry environment wiring while preserving enforcement and external contracts.",
+      "hard_effects": [],
+      "unresolved_effects": [],
+      "bounded_facts": ["single_runtime_owner", "existing_source_of_truth", "preserves_external_and_state_contracts", "preserves_security_accounting_and_routing", "local_rollback_and_focused_proof"],
+      "risk_groups": ["runtime"],
+      "direct_work": false,
+      "request_mode": "programming-loop",
+      "execution_facts": {"independence_need": "separation_of_duties", "resolved_full_planning_to_local_fix": false},
+      "proof_signal": "contract",
+      "expected": {"planning": "light", "programming": "guarded", "proof": "contract", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
+    },
+    {
+      "id": "provider-label-copy",
+      "summary": "Correct provider copy without changing selection, wire behavior, quota ownership, or model identity.",
+      "hard_effects": [],
+      "unresolved_effects": [],
+      "bounded_facts": ["single_runtime_owner", "existing_source_of_truth", "preserves_external_and_state_contracts", "preserves_security_accounting_and_routing", "local_rollback_and_focused_proof"],
+      "risk_groups": [],
+      "direct_work": true,
+      "request_mode": "ordinary",
+      "execution_facts": {"independence_need": "none", "resolved_full_planning_to_local_fix": false},
+      "proof_signal": "static",
+      "expected": {"planning": "lightweight", "programming": "direct", "proof": "static", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
+    },
+    {
+      "id": "provider-selection-failover-identity",
+      "summary": "Change provider selection, failover, or externally meaningful model identity.",
       "hard_effects": ["provider_routing_wire_model_identity"],
-      "unknown_hard_effects": [],
+      "unresolved_effects": [],
       "bounded_facts": [],
       "risk_groups": ["design", "runtime"],
       "direct_work": false,
-      "expected_gate": "full"
+      "request_mode": "ordinary",
+      "execution_facts": {"independence_need": "none", "resolved_full_planning_to_local_fix": false},
+      "proof_signal": "contract",
+      "expected": {"planning": "full", "programming": "full", "proof": "contract", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
     },
     {
-      "id": "public-payload",
-      "summary": "Change a public API response payload.",
-      "hard_effects": ["public_external_contract"],
-      "unknown_hard_effects": [],
+      "id": "rename-drop-backfill-multiservice",
+      "summary": "Rename or drop persisted data with backfill and coordinated consumers.",
+      "hard_effects": ["persisted_state_semantics", "coordinated_cross_service_state", "complex_rollback"],
+      "unresolved_effects": [],
       "bounded_facts": [],
-      "risk_groups": ["reach", "proof_rollback"],
+      "risk_groups": ["design", "runtime", "proof_rollback"],
       "direct_work": false,
-      "expected_gate": "full"
+      "request_mode": "ordinary",
+      "execution_facts": {"independence_need": "full_independent_cycle", "resolved_full_planning_to_local_fix": false},
+      "proof_signal": "release",
+      "expected": {"planning": "full", "programming": "full", "proof": "release", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
     },
     {
-      "id": "deployment-topology",
-      "summary": "Change production deployment topology and runtime ownership.",
+      "id": "deep-research-local-fix",
+      "summary": "Deep planning resolves critical uncertainty and produces a bounded local implementation.",
+      "hard_effects": [],
+      "unresolved_effects": [],
+      "bounded_facts": [],
+      "risk_groups": ["design", "reach", "proof_rollback"],
+      "direct_work": false,
+      "request_mode": "programming-loop",
+      "execution_facts": {"independence_need": "separation_of_duties", "resolved_full_planning_to_local_fix": true},
+      "proof_signal": "focused",
+      "expected": {"planning": "full", "programming": "guarded", "proof": "focused", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
+    },
+    {
+      "id": "rc-deploy-wide-rollout",
+      "summary": "Deploy a release candidate through a broad production rollout.",
       "hard_effects": ["deployment_topology_production_rollout_runtime_ownership"],
-      "unknown_hard_effects": [],
+      "unresolved_effects": [],
       "bounded_facts": [],
       "risk_groups": ["runtime", "proof_rollback"],
       "direct_work": false,
-      "expected_gate": "full"
+      "request_mode": "full-programming-loop",
+      "execution_facts": {"independence_need": "full_independent_cycle", "resolved_full_planning_to_local_fix": false},
+      "proof_signal": "release",
+      "expected": {"planning": "full", "programming": "full", "proof": "release", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
     },
     {
-      "id": "cross-cutting-feature",
-      "summary": "Add a non-bounded feature with independent design, reach, and runtime risks.",
+      "id": "bounded-over-risk-threshold",
+      "summary": "A proven bounded change remains light planning despite four correlated risk groups.",
       "hard_effects": [],
-      "unknown_hard_effects": [],
-      "bounded_facts": [],
-      "risk_groups": ["design", "reach", "runtime"],
+      "unresolved_effects": [],
+      "bounded_facts": ["single_runtime_owner", "existing_source_of_truth", "preserves_external_and_state_contracts", "preserves_security_accounting_and_routing", "local_rollback_and_focused_proof"],
+      "risk_groups": ["design", "reach", "runtime", "proof_rollback"],
       "direct_work": false,
-      "expected_gate": "full"
+      "request_mode": "programming-loop",
+      "execution_facts": {"independence_need": "independent_review", "resolved_full_planning_to_local_fix": false},
+      "proof_signal": "focused",
+      "expected": {"planning": "light", "programming": "light", "proof": "focused", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
     },
     {
-      "id": "unknown-auth-effect",
-      "summary": "The repository evidence cannot determine whether authentication enforcement changes.",
-      "hard_effects": [],
-      "unknown_hard_effects": ["executable_auth_security_privacy"],
-      "bounded_facts": [],
-      "risk_groups": ["proof_rollback"],
+      "id": "hard-effect-over-bounded-facts",
+      "summary": "Executable auth enforcement remains full even when bounded facts are claimed.",
+      "hard_effects": ["executable_auth_security_privacy"],
+      "unresolved_effects": [],
+      "bounded_facts": ["single_runtime_owner", "existing_source_of_truth", "preserves_external_and_state_contracts", "preserves_security_accounting_and_routing", "local_rollback_and_focused_proof"],
+      "risk_groups": [],
       "direct_work": false,
-      "expected_gate": "full"
+      "request_mode": "ordinary",
+      "execution_facts": {"independence_need": "none", "resolved_full_planning_to_local_fix": false},
+      "proof_signal": "contract",
+      "expected": {"planning": "full", "programming": "full", "proof": "contract", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
+    }
+  ],
+  "negative_cases": [
+    {
+      "id": "no-repo-file-loc-trigger",
+      "kind": "classification",
+      "input": {
+        "summary": "A large backend-named docs file changes only ordinary prose.",
+        "metadata": {"repository": "provider-backend", "file": "migration-provider-auth.md", "lines_changed": 9000},
+        "hard_effects": [],
+        "unresolved_effects": [],
+        "bounded_facts": ["single_runtime_owner", "existing_source_of_truth", "preserves_external_and_state_contracts", "preserves_security_accounting_and_routing", "local_rollback_and_focused_proof"],
+        "risk_groups": [],
+        "direct_work": true,
+        "request_mode": "ordinary",
+        "execution_facts": {"independence_need": "none", "resolved_full_planning_to_local_fix": false},
+        "proof_signal": "static"
+      },
+      "expected": {"planning": "lightweight", "programming": "direct", "proof": "static", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
+    },
+    {
+      "id": "light-ceiling-blocks-guarded",
+      "kind": "classification",
+      "input": {
+        "hard_effects": [],
+        "unresolved_effects": [],
+        "bounded_facts": ["single_runtime_owner", "existing_source_of_truth", "preserves_external_and_state_contracts", "preserves_security_accounting_and_routing", "local_rollback_and_focused_proof"],
+        "risk_groups": ["runtime"],
+        "direct_work": false,
+        "request_mode": "light-programming-loop",
+        "execution_facts": {"independence_need": "separation_of_duties", "resolved_full_planning_to_local_fix": false},
+        "proof_signal": "contract"
+      },
+      "expected": {"planning": "light", "programming": "light", "proof": "contract", "decision": "HUMAN_DECISION_REQUIRED", "reason_code": "LIGHT_PROFILE_CEILING", "proposed_programming_profile": "guarded", "exit": 2}
+    },
+    {
+      "id": "light-ceiling-blocks-full",
+      "kind": "classification",
+      "input": {
+        "hard_effects": ["provider_routing_wire_model_identity"],
+        "unresolved_effects": [],
+        "bounded_facts": [],
+        "risk_groups": ["runtime"],
+        "direct_work": false,
+        "request_mode": "light-programming-loop",
+        "execution_facts": {"independence_need": "none", "resolved_full_planning_to_local_fix": false},
+        "proof_signal": "contract"
+      },
+      "expected": {"planning": "full", "programming": "light", "proof": "contract", "decision": "HUMAN_DECISION_REQUIRED", "reason_code": "LIGHT_PROFILE_CEILING", "proposed_programming_profile": "full", "exit": 2}
+    },
+    {
+      "id": "unresolved-hard-effect-precedes-bounded-claim",
+      "kind": "classification",
+      "input": {
+        "hard_effects": [],
+        "unresolved_effects": ["public_external_contract"],
+        "bounded_facts": ["single_runtime_owner", "existing_source_of_truth", "preserves_external_and_state_contracts", "preserves_security_accounting_and_routing", "local_rollback_and_focused_proof"],
+        "risk_groups": [],
+        "direct_work": true,
+        "request_mode": "ordinary",
+        "execution_facts": {"independence_need": "none", "resolved_full_planning_to_local_fix": false},
+        "proof_signal": "contract"
+      },
+      "expected": {"planning": "full", "programming": "full", "proof": "contract", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
+    },
+    {
+      "id": "sql-orm-bounded-is-not-hard-by-name",
+      "kind": "classification",
+      "input": {
+        "hard_effects": [],
+        "unresolved_effects": [],
+        "bounded_facts": ["single_runtime_owner", "existing_source_of_truth", "preserves_external_and_state_contracts", "preserves_security_accounting_and_routing", "local_rollback_and_focused_proof"],
+        "risk_groups": ["runtime"],
+        "direct_work": false,
+        "request_mode": "programming-loop",
+        "execution_facts": {"independence_need": "independent_review", "resolved_full_planning_to_local_fix": false},
+        "proof_signal": "focused"
+      },
+      "expected": {"planning": "light", "programming": "light", "proof": "focused", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
+    },
+    {
+      "id": "stable-guarded-pair",
+      "kind": "guard",
+      "input": {"scenario": "role-identity-drift"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "ROLE_IDENTITY_CHANGED", "exit": 2}
+    },
+    {
+      "id": "preserve-full-fixer-fresh-qa",
+      "kind": "guard",
+      "input": {"scenario": "failed-qa-after-pass"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "LATEST_QA_NOT_PASSING", "exit": 2}
+    },
+    {
+      "id": "iteration-six-needs-extension",
+      "kind": "guard",
+      "input": {"scenario": "iteration-limit"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "ITERATION_LIMIT_REACHED", "exit": 2}
+    },
+    {
+      "id": "third-light-review-blocked",
+      "kind": "guard",
+      "input": {"scenario": "light-review-limit"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "LIGHT_REVIEW_BUDGET_EXCEEDED", "exit": 2}
+    },
+    {
+      "id": "duplicate-snapshot-check-blocked",
+      "kind": "guard",
+      "input": {"scenario": "duplicate-snapshot-check-with-invalidation-label"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "DUPLICATE_SNAPSHOT_CHECK", "exit": 2}
+    },
+    {
+      "id": "full-suite-below-release-blocked",
+      "kind": "guard",
+      "input": {"scenario": "full-suite-below-release"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "FULL_SUITE_BELOW_RELEASE", "exit": 2}
+    },
+    {
+      "id": "scope-or-profile-drift-from-decision",
+      "kind": "guard",
+      "input": {"scenario": "decision-baseline-drift"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "DECISION_BASELINE_MISMATCH", "exit": 2}
+    },
+    {
+      "id": "unexpected-action-argument-fails-closed",
+      "kind": "guard",
+      "input": {"scenario": "unexpected-action-argument"},
+      "expected": {"decision": "INVALID", "reason_code": "INVALID_INVOCATION", "exit": 1}
+    },
+    {
+      "id": "failed-mandatory-check-blocks-finalize",
+      "kind": "guard",
+      "input": {"scenario": "mandatory-check-failed"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "MANDATORY_CHECK_NOT_PASSING", "exit": 2}
+    },
+    {
+      "id": "not-run-mandatory-check-blocks-finalize",
+      "kind": "guard",
+      "input": {"scenario": "mandatory-check-not-run"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "MANDATORY_CHECK_NOT_PASSING", "exit": 2}
+    },
+    {
+      "id": "open-major-finding-blocks-finalize",
+      "kind": "guard",
+      "input": {"scenario": "open-major-finding"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "OPEN_IMPORTANT_FINDING", "exit": 2}
+    },
+    {
+      "id": "open-major-blocking-false-blocks-finalize",
+      "kind": "guard",
+      "input": {"scenario": "open-major-blocking-false"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "OPEN_IMPORTANT_FINDING", "exit": 2}
+    },
+    {
+      "id": "incomplete-plan-coverage-blocks-finalize",
+      "kind": "guard",
+      "input": {"scenario": "plan-coverage-false"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "PLAN_COVERAGE_INCOMPLETE", "exit": 2}
+    },
+    {
+      "id": "hard-effect-decision-downgrade-blocked",
+      "kind": "guard",
+      "input": {"scenario": "decision-hard-effect-downgrade"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "DECISION_ADMISSION_MISMATCH", "exit": 2}
+    },
+    {
+      "id": "planning-initial-pass-limit",
+      "kind": "guard",
+      "input": {"scenario": "planning-initial-limit"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "PLANNING_INITIAL_ALREADY_USED", "exit": 2}
+    },
+    {
+      "id": "planning-rerun-pass-limit",
+      "kind": "guard",
+      "input": {"scenario": "planning-rerun-limit"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "PLANNING_ROLE_RERUN_BUDGET_EXCEEDED", "exit": 2}
+    },
+    {
+      "id": "planning-rerun-flag-bypass-invalid",
+      "kind": "guard",
+      "input": {"scenario": "planning-rerun-false-bypass"},
+      "expected": {"decision": "INVALID", "reason_code": "INVALID_INVOCATION", "exit": 1}
+    },
+    {
+      "id": "separate-fixer-reviewer-identities-required",
+      "kind": "guard",
+      "input": {"scenario": "separate-role-identities"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "ROLE_INDEPENDENCE_VIOLATION", "exit": 2}
+    },
+    {
+      "id": "fresh-qa-reviewer-identity-required",
+      "kind": "guard",
+      "input": {"scenario": "fresh-qa-reviewer-identity"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "FRESH_QA_IDENTITY_REQUIRED", "exit": 2}
+    },
+    {
+      "id": "qa-after-fix-required",
+      "kind": "guard",
+      "input": {"scenario": "qa-after-fix"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "ACTIVITY_AFTER_FINAL_QA", "exit": 2}
+    },
+    {
+      "id": "invalid-json-artifact",
+      "kind": "guard",
+      "input": {"scenario": "invalid-json"},
+      "expected": {"decision": "INVALID", "reason_code": "INVALID_STATE", "exit": 1}
+    },
+    {
+      "id": "missing-state-artifact",
+      "kind": "guard",
+      "input": {"scenario": "missing-state-artifact"},
+      "expected": {"decision": "INVALID", "reason_code": "INVALID_STATE", "exit": 1}
+    },
+    {
+      "id": "missing-decision-artifact",
+      "kind": "guard",
+      "input": {"scenario": "missing-decision-artifact"},
+      "expected": {"decision": "INVALID", "reason_code": "INVALID_STATE", "exit": 1}
+    },
+    {
+      "id": "light-persisted-state-forbidden",
+      "kind": "guard",
+      "input": {"scenario": "light-persisted-artifact"},
+      "expected": {"decision": "INVALID", "reason_code": "INVALID_STATE", "exit": 1}
+    },
+    {
+      "id": "light-planning-council-forbidden",
+      "kind": "guard",
+      "input": {"scenario": "light-planning-council"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "ROLE_FORBIDDEN_FOR_PROFILE", "exit": 2}
+    },
+    {
+      "id": "current-iteration-dispatch-bypass-blocked",
+      "kind": "guard",
+      "input": {"scenario": "current-iteration-dispatch-bypass"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "ITERATION_SEQUENCE_MISMATCH", "exit": 2}
+    },
+    {
+      "id": "schema-unknown-state-status",
+      "kind": "guard",
+      "input": {"scenario": "schema-unknown-state-status"},
+      "expected": {"decision": "INVALID", "reason_code": "INVALID_STATE", "exit": 1}
+    },
+    {
+      "id": "schema-missing-decision-field",
+      "kind": "guard",
+      "input": {"scenario": "schema-missing-decision-field"},
+      "expected": {"decision": "INVALID", "reason_code": "INVALID_STATE", "exit": 1}
+    },
+    {
+      "id": "schema-additional-property",
+      "kind": "guard",
+      "input": {"scenario": "schema-additional-property"},
+      "expected": {"decision": "INVALID", "reason_code": "INVALID_STATE", "exit": 1}
+    },
+    {
+      "id": "schema-invalid-nested-enum",
+      "kind": "guard",
+      "input": {"scenario": "schema-invalid-nested-enum"},
+      "expected": {"decision": "INVALID", "reason_code": "INVALID_STATE", "exit": 1}
+    },
+    {
+      "id": "ordinary-prose-no-exact-wording-test",
+      "kind": "policy",
+      "input": {"constraint": "ordinary_prose_exact_wording_forbidden"},
+      "expected": {"decision": "ALLOW", "reason_code": "STRUCTURED_POLICY_ASSERTION", "exit": 0}
     }
   ]
 }

@@ -54,18 +54,18 @@ OpenWhispr is an Electron-based desktop dictation application that uses whisper.
 
 ## Plan Mode: XP Planning Loop
 
-- In Plan Mode (`/plan`, developer Plan Mode), when the user explicitly asks to plan a technical task, and before implementation in Default/Code/Ask/Debug mode, compute the Planning Loop Gate from `.ai-loop/gate-policy.json`.
-- `lightweight` means direct work without subagents or loop artifacts. `light` means a compact single-agent plan with focused proof, without council, `.ai-loop/runs`, `plans/...`, or clean-thread handoff. If the user already asked to implement, `light` does not require repeated approval.
-- Only `full` uses `docs/agent-planning-loop.md`, independent planners/reviewers, persisted artifacts, user approval, and Planning -> Programming handoff.
+- In Plan Mode and before implementation, Gate v3 independently selects `Planning: lightweight|light|full`, `Programming: direct|light|guarded|full`, and `Proof: static|focused|contract|release` from `.ai-loop/gate-policy.json`.
+- Planning `lightweight/light` is chat-only without council, `.ai-loop/runs`, `plans/...`, separate approval, or handoff. Only Planning `full` requires an approved plan, and it does not force Programming `full`.
 - If `full` is required and an approved plan for the current scope is absent or stale, stop before edits and offer the full Planning Loop or Delta Review. If independent subagents are unavailable, report `blocked-no-subagents`.
 - After approval of a `full` plan, save it in `plans/<task-slug>.md`. If a clean session/thread is unavailable, show the handoff prompt from runtime artifacts and do not start implementation in polluted planning context.
-- If an incoming message starts with `PLEASE IMPLEMENT THIS PLAN:`, classify the approved scope through Gate v2. For `light`, it is permission to implement in the current thread without artifacts or handoff. For `full`, treat it as a Codex plan-button approval event: run Planning -> Programming handoff from `docs/agent-planning-loop.md`, save the approved plan and handoff artifacts, run Programming Loop preflight, then start a clean session/thread or fail closed with the handoff prompt; do not start coding in the current planning thread.
+- `PLEASE IMPLEMENT THIS PLAN:` for Planning `full` remains a file-backed Codex plan-button approval event; do not start coding in the current planning thread.
 
 ## Agent Workflow
 
-- If the user explicitly asks for Programming Loop or requests `implement -> full QA -> fixes until pass`, use `docs/agent-programming-loop.md` and `.ai-loop/config.yml`.
-- Main agent in Programming Loop is an orchestrator, not an implementer/fixer/reviewer: after preflight it prepares state/context/snapshots and launches an independent implementer; it does not make application code/config/docs changes for the plan except loop artifacts and orchestration-only metadata.
-- Loop starts only when independent subagents are available; if runtime lacks required capabilities, stop with `Programming Loop Preflight: loop-unsupported`.
+- Ordinary implementation does not imply a Programming Loop. Explicit `Programming Loop` sets minimum `light`; `light Programming Loop` caps it at `light`; `full Programming Loop` and `implement -> full QA -> fixes until pass` force `full`. The `light` ceiling is checked before admitting a higher required profile; return `HUMAN_DECISION_REQUIRED` with the exact proposed profile instead of escalating silently.
+- In Programming `light`, main implements and one stable reviewer gets initial review plus one recheck through transient decision/state and the guard, without a persisted run. In `guarded/full`, main is orchestrator-only; `guarded` uses a stable pair and `full` preserves fixer/fresh QA.
+- Derive Programming from present/unresolved effects and `execution_facts.independence_need`, not from an output-shaped implementation label. Full planning may hand a resolved bounded local fix to `guarded`.
+- For `light`, keep transient decision/state outside `.ai-loop/runs`; for `guarded/full`, persist `input/decision.json` and state v2. Run `.ai-loop/bin/guard.mjs --decision ...` before role/check/budget/final admission: it independently derives the required Programming profile and reconstructs review, iteration, and planning-pass counters from ordered activity. Base limit is 5 and extensions require current-dialog approval in a continuous ledger.
 - Keep the user UX chat-first: do not ask the user to manually run CLI commands or copy prompts. Commands may be used only as an internal runtime/check layer of the orchestrator.
 - Do not use manual/copy-paste fallback and do not simulate independent QA as sequential roles of one agent.
 - For medium/large tasks, first research context, then UX for user-visible changes, then design/spec; start implementation only after explicit user confirmation.
