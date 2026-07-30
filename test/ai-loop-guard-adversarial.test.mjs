@@ -135,6 +135,7 @@ test("open minor and nit findings do not block final admission", () => {
 test("guard independently rejects a hash-consistent hard-effect profile downgrade", () => {
   const decision = decisionFixture("guarded", {
     effects: ["public_external_contract"],
+    explicit_loop_request: "full-programming-loop",
     execution_facts: {independence_need: "separation_of_duties", resolved_full_planning_to_local_fix: false},
   });
   const state = bindDecision(stateFixture("guarded"), decision);
@@ -188,7 +189,10 @@ test("full role identities are separate and each QA reviewer is fresh", () => {
 
 test("planning role initial and rerun budgets derive only from ordered activity", () => {
   const role = "reviewer-project-dod";
-  const decision = decisionFixture("guarded", {planning_profile: "full"});
+  const decision = decisionFixture("guarded", {
+    planning_profile: "full",
+    explicit_loop_request: "full-planning-loop",
+  });
   const state = bindDecision(stateFixture("guarded"), decision);
   state.loop_type = "planning";
   state.iteration = 0;
@@ -363,6 +367,8 @@ test("every structured guard negative case has an executable scenario", () => {
     "open-major-finding",
     "plan-coverage-false",
     "decision-hard-effect-downgrade",
+    "full-planning-without-opt-in",
+    "full-programming-without-opt-in",
     "planning-initial-limit",
     "planning-rerun-limit",
     "planning-rerun-false-bypass",

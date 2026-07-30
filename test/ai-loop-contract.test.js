@@ -19,13 +19,21 @@ const profiles = (policy, scenario) => {
     scenario.bounded_facts.includes(fact)
   );
   const riskCount = new Set(scenario.risk_groups).size;
+  const request = scenario.request_mode;
+  const stage = scenario.workflow_stage || "programming";
+  const fullPlanningRecommended =
+    observedHard.length > 0 ||
+    (!bounded && riskCount >= policy.planning.full_min_independent_risk_groups);
+  const fullPlanningAuthorized = [
+    "full-planning-loop",
+    "full-planning-and-programming-loop",
+  ].includes(request);
   let planning;
-  if (observedHard.length) planning = "full";
+  if (fullPlanningAuthorized) planning = "full";
+  else if (fullPlanningRecommended) planning = "light";
   else if (bounded) planning = scenario.direct_work && riskCount === 0 ? "lightweight" : "light";
-  else if (riskCount >= policy.planning.full_min_independent_risk_groups) planning = "full";
   else planning = scenario.direct_work && riskCount === 0 ? "lightweight" : "light";
 
-  const request = scenario.request_mode;
   const execution = scenario.execution_facts;
   const independence = execution.independence_need;
   let requiredProgramming = "direct";
@@ -51,13 +59,32 @@ const profiles = (policy, scenario) => {
     reasonCode = "LIGHT_PROFILE_CEILING";
     proposedProgrammingProfile = requiredProgramming;
     exit = 2;
-  } else if (["full-programming-loop", "full-qa-until-pass"].includes(request)) {
+  } else if (
+    [
+      "full-programming-loop",
+      "full-planning-and-programming-loop",
+      "full-qa-until-pass",
+    ].includes(request)
+  ) {
     programming = "full";
+  } else if (requiredProgramming === "full") {
+    programming = "guarded";
+    proposedProgrammingProfile = "full";
+    if (stage === "programming") {
+      decision = "HUMAN_DECISION_REQUIRED";
+      reasonCode = "FULL_PROGRAMMING_OPT_IN_REQUIRED";
+      exit = 2;
+    }
   } else if (
     ["programming-loop", "light-programming-loop"].includes(request) &&
     rank[programming] < rank.light
   ) {
     programming = "light";
+  }
+  if (stage === "planning" && fullPlanningRecommended && !fullPlanningAuthorized) {
+    decision = "HUMAN_DECISION_REQUIRED";
+    reasonCode = "FULL_PLANNING_OPT_IN_REQUIRED";
+    exit = 2;
   }
   return {
     planning,

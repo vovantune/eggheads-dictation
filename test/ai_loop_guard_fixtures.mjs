@@ -60,7 +60,7 @@ export function decisionFixture(profile = "guarded", overrides = {}) {
     programming_profile: profile,
     proof_profile: "focused",
     proposed_programming_profile: null,
-    explicit_loop_request: "programming-loop",
+    explicit_loop_request: profile === "full" ? "full-programming-loop" : "programming-loop",
     scope,
     scope_hash: hash(scope),
     initial_role_assignments: rolesFor(profile),

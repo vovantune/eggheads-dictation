@@ -5,7 +5,7 @@ Build a facts-only Context Pack for Planning Loop.
 Include:
 
 - user goal and success criteria;
-- the three selected profiles (`planning`, `programming`, `proof`) and whether a loop was explicitly requested;
+- the three selected profiles (`planning`, `programming`, `proof`) and the exact explicit loop request;
 - a scope capsule with owner, source of truth, in-scope, out-of-scope, direct consumers, and local rollback;
 - current architecture and source of truth;
 - in-scope and non-goals;
@@ -18,3 +18,4 @@ Include:
 
 Do not choose an approach in this prompt.
 Do not add a test unless the Context Pack names an uncovered failure mode. A full suite belongs only to `release` proof or an explicit mandatory project gate.
+Do not create this full Context Pack or dispatch planning roles until the user explicitly opts into full Planning in the current dialog.

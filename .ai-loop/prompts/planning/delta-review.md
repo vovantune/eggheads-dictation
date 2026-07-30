@@ -15,5 +15,5 @@ Always check impact on:
 - selected Programming and Proof profiles;
 - scope capsule, role budget, and Check Map invalidation.
 
-Return whether the existing plan remains fresh, needs targeted reviewer/planner reruns, or requires a full Planning Loop rerun.
-Rerun only affected roles within their one targeted-rerun budget. A changed approach, owner, material effect, or critical proof gate requires full planning; ordinary text changes do not.
+Return whether the existing plan remains fresh, needs targeted reviewer/planner reruns, or justifies recommending a full Planning Loop rerun.
+Rerun only affected roles within their one targeted-rerun budget. A changed approach, owner, material effect, or critical proof gate may justify full planning, but a new full run still requires explicit current-dialog user opt-in; ordinary text changes do not.

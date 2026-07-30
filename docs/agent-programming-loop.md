@@ -27,9 +27,11 @@ Proof: static | focused | contract | release
 - `guarded`: один стабильный independent implementer и один стабильный independent reviewer используют compact run; тот же implementer исправляет, тот же reviewer перепроверяет.
 - `full`: существующий independent implementer/fixer/fresh full-QA flow из следующих разделов сохраняется без ослабления.
 
-Main в `guarded/full` остаётся orchestrator и не исправляет code/config/docs сам. Обычная просьба реализовать задачу не включает Programming Loop. Явный `Programming Loop` задаёт минимум `light`, `light Programming Loop` — одновременно потолок `light`, а `full Programming Loop` и `implement → full QA → fixes until pass` форсируют `full`.
+Main в `guarded/full` остаётся orchestrator и не исправляет code/config/docs сам. Обычная просьба реализовать задачу не включает Programming Loop. Явный `Programming Loop` задаёт минимум `light`, `light Programming Loop` — одновременно потолок `light`, а `full Programming Loop` и `implement → full QA → fixes until pass` явно разрешают `full`.
 
-Required profile выводится из present/unresolved effects и `execution_facts.independence_need`, а не из заранее выбранной формы реализации. Hard effect требует `full`; separation of duties — `guarded`; independent review — `light`. Resolved full planning может передать bounded local fix в `guarded`. Автоматически повышать `direct → light → guarded → full` нельзя: для `light Programming Loop` сначала проверь upper cap и при недостаточности верни `HUMAN_DECISION_REQUIRED`/`LIGHT_PROFILE_CEILING` с точным `proposed_programming_profile`.
+Required profile выводится из present/unresolved effects и `execution_facts.independence_need`, а не из заранее выбранной формы реализации. Hard effect или `full_independent_cycle` может обосновать рекомендацию `full`; separation of duties — `guarded`; independent review — `light`. Resolved full planning может передать bounded local fix в `guarded`.
+
+Автоматический потолок Programming — `guarded`. Если факты рекомендуют `full`, но пользователь не запросил `full Programming Loop`/`full QA until pass` в текущем диалоге, до создания run и dispatch ролей верни `HUMAN_DECISION_REQUIRED`/`FULL_PROGRAMMING_OPT_IN_REQUIRED`. Назови точные effects, почему `guarded` недостаточен, дополнительные роли/artifacts/checks и более дешёвый вариант. Repo-local правило не является пользовательским opt-in. Planning `full` также не разрешает Programming `full`.
 
 ## 0.1 Runtime Preflight
 

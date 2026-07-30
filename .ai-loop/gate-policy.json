@@ -36,10 +36,11 @@
   ],
   "planning": {
     "classification_order": [
-      "material_or_boundary_hard_effect_present_or_unresolved",
+      "compute_full_recommendation_from_material_or_boundary_hard_effects",
       "bounded_change",
       "independent_risk_group_threshold",
-      "direct_work"
+      "direct_work",
+      "require_explicit_full_planning_opt_in"
     ],
     "hard_effects": {
       "material": {
@@ -75,16 +76,20 @@
     "full_min_independent_risk_groups": 3,
     "rules": {
       "lightweight": "No present or unresolved hard effect, direct work, and no independent risk group.",
-      "light": "No present or unresolved hard effect and either a proven bounded change or one to two independent risk groups.",
-      "full": "Any present or unresolved hard effect, complex coordination, or at least three independent risk groups when bounded change is not proven."
-    }
+      "light": "Default automatic planning ceiling. Use for a proven bounded change, one to two independent risk groups, or while presenting a full recommendation for user approval.",
+      "full": "Explicit opt-in only. Present or unresolved hard effects, complex coordination, or at least three independent risk groups may justify recommending full, but never start full planning automatically."
+    },
+    "automatic_ceiling": "light",
+    "full_opt_in": "Without an explicit full-planning-loop or full-planning-and-programming-loop request in the current dialog, return HUMAN_DECISION_REQUIRED before creating artifacts or dispatching planning roles. Explain the exact effects, why light is insufficient, which roles/artifacts are added, and the cheaper alternative."
   },
   "programming": {
     "request_modes": [
       "ordinary",
       "programming-loop",
       "light-programming-loop",
+      "full-planning-loop",
       "full-programming-loop",
+      "full-planning-and-programming-loop",
       "full-qa-until-pass"
     ],
     "independence_needs": [
@@ -98,6 +103,7 @@
       "compute_required_profile_from_independence_need",
       "preserve_guarded_for_resolved_full_planning_local_fix",
       "apply_explicit_light_upper_cap_before_higher_admission",
+      "require_explicit_full_programming_opt_in",
       "apply_explicit_minimum_or_forced_profile"
     ],
     "rules": {
@@ -110,12 +116,14 @@
       "ordinary": "Does not request a Programming Loop.",
       "programming-loop": "Sets minimum programming profile light but does not force full.",
       "light-programming-loop": "Sets both minimum and maximum programming profile light; if facts require guarded or full, return HUMAN_DECISION_REQUIRED with reason LIGHT_PROFILE_CEILING and the exact proposed profile before admitting work.",
+      "full-planning-loop": "Authorizes full Planning only. It does not authorize full Programming.",
       "full-programming-loop": "Forces full.",
+      "full-planning-and-programming-loop": "Explicitly authorizes both full Planning and full Programming.",
       "full-qa-until-pass": "Forces full."
     },
     "fact_rules": {
-      "present_or_unresolved_hard_effect": "Requires full unless the effect is no longer present or unresolved; a task label or claimed main-agent shape cannot lower it.",
-      "full_independent_cycle": "Requires full.",
+      "present_or_unresolved_hard_effect": "Recommends full. Without explicit full Programming opt-in, stop with HUMAN_DECISION_REQUIRED instead of starting or silently downgrading.",
+      "full_independent_cycle": "Recommends full and requires explicit full Programming opt-in.",
       "separation_of_duties": "Requires guarded.",
       "resolved_full_planning_to_local_fix": "When full planning resolved uncertainty to a local bounded fix with no present or unresolved hard effect, guarded remains available.",
       "independent_review": "Requires light.",
@@ -123,8 +131,11 @@
     },
     "admission": {
       "allow": {"decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "exit": 0},
-      "light_ceiling": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "LIGHT_PROFILE_CEILING", "exit": 2}
+      "light_ceiling": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "LIGHT_PROFILE_CEILING", "exit": 2},
+      "full_planning_opt_in": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "FULL_PLANNING_OPT_IN_REQUIRED", "exit": 2},
+      "full_programming_opt_in": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "FULL_PROGRAMMING_OPT_IN_REQUIRED", "exit": 2}
     },
+    "automatic_ceiling": "guarded",
     "silent_escalation": "forbidden"
   },
   "proof": {
@@ -154,6 +165,9 @@
     "A backend repository name is not a scope capsule.",
     "Provider-adjacent copy, labels, docs, metadata, and local config are not hard effects unless executable selection, wire, identity, accounting, auth, or external/state semantics change.",
     "A migration filename is not a hard effect when an additive nullable change is proven bounded without backfill, material lock, rollout, or consumer risk.",
+    "Full Planning and full Programming are independent explicit opt-ins; risk may justify a recommendation but never authorizes either profile.",
+    "Before requesting full, explain exact effects, why the lighter ceiling is insufficient, added roles/artifacts/checks, and the cheaper alternative; wait for an explicit current-dialog decision.",
+    "Repository rules and mandatory gates may justify recommending full but cannot count as user authorization.",
     "Do not auto-escalate a selected programming profile; stop with HUMAN_DECISION_REQUIRED and propose the exact higher profile.",
     "Do not repeat a check on the same input snapshot or create an exact-wording test for ordinary prose."
   ]

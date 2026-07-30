@@ -4,6 +4,8 @@ import {
   activity,
   approvedScope,
   assertOutcome,
+  bindDecision,
+  decisionFixture,
   expectedCase,
   invoke,
   stateFixture,
@@ -56,6 +58,43 @@ test("guard allows assigned roles and rejects identity or profile drift", () => 
   assert.equal(invoke(stateFixture("full"), [
     "--action", "dispatch-role", "--role", "fixer", "--actor-id", "fix-a", "--iteration", "1",
   ]).status, 0);
+});
+
+test("full planning and programming require separate explicit opt-ins", () => {
+  const planningDecision = decisionFixture("guarded", {
+    planning_profile: "full",
+    explicit_loop_request: "programming-loop",
+  });
+  const planningState = bindDecision(stateFixture("guarded"), planningDecision);
+  planningState.loop_type = "planning";
+  planningState.iteration = 0;
+  assertOutcome(
+    invoke(planningState, ["--action", "validate-state"], {decision: planningDecision}),
+    expectedCase("full-planning-without-opt-in-blocked"),
+  );
+
+  planningDecision.explicit_loop_request = "full-planning-loop";
+  bindDecision(planningState, planningDecision);
+  assert.equal(
+    invoke(planningState, ["--action", "validate-state"], {decision: planningDecision}).status,
+    0,
+  );
+
+  const programmingDecision = decisionFixture("full", {
+    explicit_loop_request: "programming-loop",
+  });
+  const programmingState = bindDecision(stateFixture("full"), programmingDecision);
+  assertOutcome(
+    invoke(programmingState, ["--action", "validate-state"], {decision: programmingDecision}),
+    expectedCase("full-programming-without-opt-in-blocked"),
+  );
+
+  programmingDecision.explicit_loop_request = "full-programming-loop";
+  bindDecision(programmingState, programmingDecision);
+  assert.equal(
+    invoke(programmingState, ["--action", "validate-state"], {decision: programmingDecision}).status,
+    0,
+  );
 });
 
 test("light review count is derived from ordered activity and cannot be reset", () => {

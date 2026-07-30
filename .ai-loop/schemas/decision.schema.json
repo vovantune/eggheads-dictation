@@ -40,7 +40,9 @@
         "ordinary",
         "programming-loop",
         "light-programming-loop",
+        "full-planning-loop",
         "full-programming-loop",
+        "full-planning-and-programming-loop",
         "full-qa-until-pass"
       ]
     },

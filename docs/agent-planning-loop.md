@@ -4,7 +4,7 @@
 
 Это не skill. Перед классификацией прочитай только `.ai-loop/gate-policy.json`; `.ai-loop/gate-cases.json` — regression fixture. Этот full-loop reference после раздела Gate читается только для Planning `full`.
 
-Full XP Planning Loop обязателен только при доступных независимых agents/subagents/agent threads. Во всех рабочих средах проекта multiagent должен быть доступен. Если агент не может запустить независимых агентов, он обязан остановиться и сообщить пользователю, что full loop выполнить нельзя. Последовательное исполнение ролей одним агентом не является допустимым full loop и не должно маскироваться под независимое ревью.
+После явного opt-in Full XP Planning Loop выполняется только при доступных независимых agents/subagents/agent threads. Если агент не может запустить независимых агентов, он обязан остановиться и сообщить пользователю, что full loop выполнить нельзя. Последовательное исполнение ролей одним агентом не является допустимым full loop и не должно маскироваться под независимое ревью.
 
 Этот файл сохраняет project-specific OpenWhispr DoD. Portable core синхронизируется byte-identical между development-agent repositories; локальные integration boundaries определяются `CLAUDE.md`.
 
@@ -18,7 +18,7 @@ Gate v3 классифицирует доказанные фактические
 Planning: lightweight | light | full
 Programming: direct | light | guarded | full
 Proof: static | focused | contract | release
-Explicit loop request: yes|no — ordinary|Programming Loop|light Programming Loop|full Programming Loop
+Explicit loop request: ordinary|Programming Loop|light Programming Loop|full Planning Loop|full Programming Loop|full Planning + Programming Loop
 Scope: owner; source_of_truth; in_scope; out_of_scope; direct_consumers; rollback
 Hard effects: present|absent|unknown — ...
 Bounded change: yes|no|unknown — ...
@@ -31,13 +31,15 @@ Why not full: ...   # обязательно для lightweight/light
 
 Для `lightweight` decision остаётся компактно в чате. Programming `light` обязательно использует guard: transient `decision.json` и state лежат вне `.ai-loop/runs`. Для Programming `guarded/full` сохрани baseline как `input/decision.json`. Decision фиксирует profiles, admission decision/reason, scope hash, initial roles и фактические execution inputs; source of truth алгоритма остаётся только `.ai-loop/gate-policy.json`.
 
-Planning profile выбирается в прежнем порядке:
+Planning profile выбирается в таком порядке:
 
 1. Выполни bounded read-only discovery по репозиторию. Не повышай gate из-за слова `provider`, `auth`, `deployment`, `payload`, `session` или `UX`.
-2. Если доказан material hard effect, boundary hard effect или после discovery остается возможный hard effect, выбери `full` либо задай blocking question.
+2. Если доказан material/boundary hard effect, после discovery остается возможный hard effect либо насчитано три-четыре независимые risk groups, сформируй рекомендацию `full`.
 3. Если доказаны все bounded-change facts и hard effects отсутствуют, gate не выше `light`.
 4. Иначе считай только независимые risk groups. Коррелирующие опасения внутри одной группы считаются один раз.
-5. Три или четыре независимые risk groups дают `full`; одна-две дают `light`; direct work без risk groups дает `lightweight`.
+5. Без явного opt-in пользователя автоматический потолок — `light`: до создания artifacts и запуска ролей верни `HUMAN_DECISION_REQUIRED` и объясни, почему предлагается `full`.
+
+Planning `full` — только opt-in. Перед запросом разрешения назови точные effects/unknowns, почему `light` недостаточен, какие роли/artifacts/checks добавятся и какой более дешёвый вариант доступен. Repo-local правило, mandatory gate или собственная оценка риска не являются разрешением. Пользователь должен явно запросить `full Planning Loop` либо утвердить эту рекомендацию в текущем диалоге.
 
 Programming profile выбирается независимо:
 
@@ -46,9 +48,9 @@ Programming profile выбирается независимо:
 - `guarded`: один стабильный independent implementer и один стабильный independent reviewer используют compact run; тот же implementer исправляет, тот же reviewer перепроверяет;
 - `full`: сохраняется существующий independent implementer/fixer/fresh full-QA flow.
 
-Required Programming profile выводится из effects и `independence_need`: present/unresolved hard effect или `full_independent_cycle` требует `full`; `separation_of_duties` требует `guarded`; `independent_review` требует `light`; `none` допускает `direct`. Если full planning снял критическую неизвестность и оставил bounded local fix без present/unresolved hard effect, доступен `guarded`. Planning `full` сам по себе Programming `full` не форсирует.
+Required Programming profile выводится из effects и `independence_need`: present/unresolved hard effect или `full_independent_cycle` может обосновать рекомендацию `full`; `separation_of_duties` требует `guarded`; `independent_review` требует `light`; `none` допускает `direct`. Если full planning снял критическую неизвестность и оставил bounded local fix без present/unresolved hard effect, доступен `guarded`. Planning `full` сам по себе Programming `full` не форсирует.
 
-Обычная просьба реализовать задачу не включает loop. Явный `Programming Loop` задаёт минимум `light`; `light Programming Loop` одновременно задаёт потолок `light`; `full Programming Loop` и `implement → full QA → fixes until pass` форсируют `full`. Потолок `light` проверяется до admission более высокого required profile: результат — `HUMAN_DECISION_REQUIRED`, reason `LIGHT_PROFILE_CEILING` и точный `proposed_programming_profile`, а не молчаливое повышение.
+Обычная просьба реализовать задачу не включает loop. Явный `Programming Loop` задаёт минимум `light`; `light Programming Loop` одновременно задаёт потолок `light`; `full Programming Loop` и `implement → full QA → fixes until pass` явно разрешают `full`. Без такого opt-in автоматический потолок — `guarded`: если факты рекомендуют `full`, верни `HUMAN_DECISION_REQUIRED`/`FULL_PROGRAMMING_OPT_IN_REQUIRED`, объясни добавочную стоимость и дождись решения. Потолок `light` по-прежнему даёт `LIGHT_PROFILE_CEILING`.
 
 Proof profile:
 
@@ -99,7 +101,7 @@ Bounded change не может перекрыть hard effect.
 - `runtime`: performance/load/async/scheduler/sync/session-state/relay/degraded-runtime behavior;
 - `proof_rollback`: критическое поведение трудно доказать локально или rollback не является прямым bounded revert.
 
-Неизвестность не является дополнительной risk group. Сначала проверь evidence; unresolved possible hard effect означает blocking question или `full`.
+Неизвестность не является дополнительной risk group. Сначала проверь evidence; unresolved possible hard effect означает blocking question или аргументированную рекомендацию `full`, но не автоматический запуск.
 
 ### Lightweight
 
@@ -123,9 +125,9 @@ Bounded change не может перекрыть hard effect.
 
 ### Full
 
-Planning `full` обязателен при любом present/unresolved hard effect или при трех-четырех независимых risk groups, если bounded-change cap не доказан.
+Planning `full` доступен только после явного opt-in пользователя. Present/unresolved hard effect или три-четыре независимые risk groups могут обосновать рекомендацию, но до разрешения запрещены planning artifacts, council и role dispatch.
 
-Для Planning `full` сначала прочитай весь этот документ, затем выполни полноценный multiagent loop. Planning `full` не форсирует Programming `full`: доказанно bounded implementation может быть `guarded`.
+После opt-in для Planning `full` прочитай весь этот документ и выполни полноценный multiagent loop. Planning `full` не форсирует Programming `full`: доказанно bounded implementation может быть `guarded`, а full Programming требует отдельного opt-in.
 
 ### Blocked: No Subagents
 
@@ -518,6 +520,7 @@ Planning Loop считается рабочим, если выполняются
 - DB/API задачи содержат project-specific generated docs/tests gates.
 - `lightweight` задачи не читают full protocol и не запускают council.
 - Gate фиксирует все три profiles; explicit Programming Loop для простой задачи даёт Programming `light`, а Planning `full` не форсирует Programming `full`.
+- Full Planning и full Programming запускаются только после независимых явных opt-in в текущем диалоге; рекомендация, hard effect или repo-local gate сами по себе не запускают artifacts/roles.
 - Каждая applicable full-planning role имеет один initial pass и максимум один targeted rerun. Оба pass записываются как ordered `activity.type=planning` с `role` и `pass=initial|rerun`; guard выводит budget из activity, поэтому CLI-флаг или сброс counter не может открыть дополнительный запуск.
 - Check Map запрещает duplicate check того же snapshot и full suite ниже `release`, кроме mandatory project gate.
 - Если full нужен, но subagents недоступны, агент останавливается с `blocked-no-subagents`.
@@ -535,11 +538,13 @@ Planning Loop считается рабочим, если выполняются
 | Additive nullable column без backfill/lock/consumer risk | `light/guarded/contract` |
 | Bounded Sentry env-wrapper | `light/guarded/contract` |
 | Provider label/copy | `lightweight/direct/static` |
-| Provider selection/failover/model identity | `full/full/contract|release` |
-| Rename/drop/backfill/multi-service migration | `full/full/release` |
-| Глубокое исследование с локальным fix | `full/guarded/focused|contract` |
-| RC deploy/широкий rollout | `full/full/release` |
-| "Не используй subagents, но спланируй DB/API изменение" | Planning outcome `blocked-no-subagents` |
+| «Изучи task/план и дай feedback» | `lightweight/direct/static` |
+| Provider selection/failover/model identity без full opt-in | `light/guarded/contract` + `FULL_PROGRAMMING_OPT_IN_REQUIRED` |
+| Rename/drop/backfill/multi-service migration без full opt-in | `light/guarded/release` + `FULL_PROGRAMMING_OPT_IN_REQUIRED` |
+| Глубокое исследование без full Planning opt-in | `light/guarded/focused|contract` + `FULL_PLANNING_OPT_IN_REQUIRED` |
+| Явный full Planning после аргументации | `full/direct|light|guarded/focused|contract` |
+| Явный full Planning + Programming для RC deploy | `full/full/release` |
+| "Не используй subagents, но запусти full Planning" | Planning outcome `blocked-no-subagents` после opt-in |
 
 Dry-run verification contract:
 
@@ -548,4 +553,4 @@ Dry-run verification contract:
 - `full` pass: transcript содержит gate `full`; после gate есть чтение `docs/agent-planning-loop.md`; есть отдельные subagent/agent-thread calls для planners и reviewer agents; final plan содержит synthesis, а не только список мнений.
 - `blocked-no-subagents` pass: transcript содержит gate `blocked-no-subagents`; нет roleplay planners/reviewers; агент останавливается и объясняет, что full loop требует независимых agents/subagents.
 - OpenWhispr planning pass: successful `full` planning создаёт или называет `plans/...` artifact; `lightweight/light` остаются chat-only.
-- Delta Review pass: transcript называет changed scope, затронутые roles/checks и impact; full loop повторяется при смене подхода, owner, material effect или critical proof gate.
+- Delta Review pass: transcript называет changed scope, затронутые roles/checks и impact; смена подхода, owner, material effect или critical proof gate может обосновать full rerun, но он ждёт нового явного opt-in.

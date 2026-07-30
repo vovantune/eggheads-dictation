@@ -16,6 +16,20 @@
       "expected": {"planning": "lightweight", "programming": "direct", "proof": "static", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
     },
     {
+      "id": "analysis-feedback-direct",
+      "summary": "Inspect an existing task or plan and give read-only feedback.",
+      "hard_effects": [],
+      "unresolved_effects": [],
+      "bounded_facts": ["single_runtime_owner", "existing_source_of_truth", "preserves_external_and_state_contracts", "preserves_security_accounting_and_routing", "local_rollback_and_focused_proof"],
+      "risk_groups": [],
+      "direct_work": true,
+      "workflow_stage": "planning",
+      "request_mode": "ordinary",
+      "execution_facts": {"independence_need": "none", "resolved_full_planning_to_local_fix": false},
+      "proof_signal": "static",
+      "expected": {"planning": "lightweight", "programming": "direct", "proof": "static", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
+    },
+    {
       "id": "simple-explicit-programming-loop",
       "summary": "Perform a simple bounded task with an explicit Programming Loop request.",
       "hard_effects": [],
@@ -104,7 +118,7 @@
       "request_mode": "ordinary",
       "execution_facts": {"independence_need": "none", "resolved_full_planning_to_local_fix": false},
       "proof_signal": "contract",
-      "expected": {"planning": "full", "programming": "full", "proof": "contract", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
+      "expected": {"planning": "light", "programming": "guarded", "proof": "contract", "decision": "HUMAN_DECISION_REQUIRED", "reason_code": "FULL_PROGRAMMING_OPT_IN_REQUIRED", "proposed_programming_profile": "full", "exit": 2}
     },
     {
       "id": "rename-drop-backfill-multiservice",
@@ -117,7 +131,7 @@
       "request_mode": "ordinary",
       "execution_facts": {"independence_need": "full_independent_cycle", "resolved_full_planning_to_local_fix": false},
       "proof_signal": "release",
-      "expected": {"planning": "full", "programming": "full", "proof": "release", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
+      "expected": {"planning": "light", "programming": "guarded", "proof": "release", "decision": "HUMAN_DECISION_REQUIRED", "reason_code": "FULL_PROGRAMMING_OPT_IN_REQUIRED", "proposed_programming_profile": "full", "exit": 2}
     },
     {
       "id": "deep-research-local-fix",
@@ -127,10 +141,25 @@
       "bounded_facts": [],
       "risk_groups": ["design", "reach", "proof_rollback"],
       "direct_work": false,
+      "workflow_stage": "planning",
       "request_mode": "programming-loop",
       "execution_facts": {"independence_need": "separation_of_duties", "resolved_full_planning_to_local_fix": true},
       "proof_signal": "focused",
-      "expected": {"planning": "full", "programming": "guarded", "proof": "focused", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
+      "expected": {"planning": "light", "programming": "guarded", "proof": "focused", "decision": "HUMAN_DECISION_REQUIRED", "reason_code": "FULL_PLANNING_OPT_IN_REQUIRED", "proposed_programming_profile": null, "exit": 2}
+    },
+    {
+      "id": "deep-research-explicit-full-planning",
+      "summary": "Run full Planning only after explicit user opt-in.",
+      "hard_effects": [],
+      "unresolved_effects": [],
+      "bounded_facts": [],
+      "risk_groups": ["design", "reach", "proof_rollback"],
+      "direct_work": false,
+      "workflow_stage": "planning",
+      "request_mode": "full-planning-loop",
+      "execution_facts": {"independence_need": "separation_of_duties", "resolved_full_planning_to_local_fix": false},
+      "proof_signal": "contract",
+      "expected": {"planning": "full", "programming": "guarded", "proof": "contract", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
     },
     {
       "id": "rc-deploy-wide-rollout",
@@ -140,7 +169,7 @@
       "bounded_facts": [],
       "risk_groups": ["runtime", "proof_rollback"],
       "direct_work": false,
-      "request_mode": "full-programming-loop",
+      "request_mode": "full-planning-and-programming-loop",
       "execution_facts": {"independence_need": "full_independent_cycle", "resolved_full_planning_to_local_fix": false},
       "proof_signal": "release",
       "expected": {"planning": "full", "programming": "full", "proof": "release", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
@@ -169,7 +198,21 @@
       "request_mode": "ordinary",
       "execution_facts": {"independence_need": "none", "resolved_full_planning_to_local_fix": false},
       "proof_signal": "contract",
-      "expected": {"planning": "full", "programming": "full", "proof": "contract", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
+      "expected": {"planning": "light", "programming": "guarded", "proof": "contract", "decision": "HUMAN_DECISION_REQUIRED", "reason_code": "FULL_PROGRAMMING_OPT_IN_REQUIRED", "proposed_programming_profile": "full", "exit": 2}
+    },
+    {
+      "id": "containerd-production-migration-opt-in",
+      "summary": "A production containerd storage migration cannot auto-start full Programming.",
+      "hard_effects": ["deployment_topology_production_rollout_runtime_ownership", "complex_rollback"],
+      "unresolved_effects": [],
+      "bounded_facts": [],
+      "risk_groups": ["runtime", "proof_rollback"],
+      "direct_work": false,
+      "workflow_stage": "programming",
+      "request_mode": "ordinary",
+      "execution_facts": {"independence_need": "full_independent_cycle", "resolved_full_planning_to_local_fix": false},
+      "proof_signal": "release",
+      "expected": {"planning": "light", "programming": "guarded", "proof": "release", "decision": "HUMAN_DECISION_REQUIRED", "reason_code": "FULL_PROGRAMMING_OPT_IN_REQUIRED", "proposed_programming_profile": "full", "exit": 2}
     }
   ],
   "negative_cases": [
@@ -218,7 +261,7 @@
         "execution_facts": {"independence_need": "none", "resolved_full_planning_to_local_fix": false},
         "proof_signal": "contract"
       },
-      "expected": {"planning": "full", "programming": "light", "proof": "contract", "decision": "HUMAN_DECISION_REQUIRED", "reason_code": "LIGHT_PROFILE_CEILING", "proposed_programming_profile": "full", "exit": 2}
+      "expected": {"planning": "light", "programming": "light", "proof": "contract", "decision": "HUMAN_DECISION_REQUIRED", "reason_code": "LIGHT_PROFILE_CEILING", "proposed_programming_profile": "full", "exit": 2}
     },
     {
       "id": "unresolved-hard-effect-precedes-bounded-claim",
@@ -233,7 +276,7 @@
         "execution_facts": {"independence_need": "none", "resolved_full_planning_to_local_fix": false},
         "proof_signal": "contract"
       },
-      "expected": {"planning": "full", "programming": "full", "proof": "contract", "decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "proposed_programming_profile": null, "exit": 0}
+      "expected": {"planning": "light", "programming": "guarded", "proof": "contract", "decision": "HUMAN_DECISION_REQUIRED", "reason_code": "FULL_PROGRAMMING_OPT_IN_REQUIRED", "proposed_programming_profile": "full", "exit": 2}
     },
     {
       "id": "sql-orm-bounded-is-not-hard-by-name",
@@ -333,6 +376,18 @@
       "kind": "guard",
       "input": {"scenario": "decision-hard-effect-downgrade"},
       "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "DECISION_ADMISSION_MISMATCH", "exit": 2}
+    },
+    {
+      "id": "full-planning-without-opt-in-blocked",
+      "kind": "guard",
+      "input": {"scenario": "full-planning-without-opt-in"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "FULL_PLANNING_OPT_IN_REQUIRED", "exit": 2}
+    },
+    {
+      "id": "full-programming-without-opt-in-blocked",
+      "kind": "guard",
+      "input": {"scenario": "full-programming-without-opt-in"},
+      "expected": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "FULL_PROGRAMMING_OPT_IN_REQUIRED", "exit": 2}
     },
     {
       "id": "planning-initial-pass-limit",

@@ -2,6 +2,8 @@
 
 Use the three-axis decision from `.ai-loop/gate-policy.json`.
 
+Never start `full` automatically. Before any full artifacts or role dispatch, show the exact effects, why `light` is insufficient, the additional roles/artifacts/checks, and the cheaper alternative; then wait for an explicit current-dialog full Planning opt-in. Full Programming needs a separate explicit opt-in.
+
 For `gate: "full"`, synthesize independent planner and reviewer outputs into the persisted final plan. Return:
 
 - human-readable final plan;
@@ -44,6 +46,6 @@ For `status: "blocked"`, include `block_reason`; do not invent full plan fields 
 
 Use `status: "approved"` with `handoff` only for `gate: "full"`, after the user approves the plan and the approved plan is saved to `plans/<task-slug>.md`.
 
-Do not infer Programming `full` from Planning `full`. Select `direct`, `light`, `guarded`, or `full` independently. Do not silently raise a selected profile; return `HUMAN_DECISION_REQUIRED` with the exact proposed profile.
+Do not infer Programming `full` from Planning `full`. Select `direct`, `light`, `guarded`, or `full` independently. A full recommendation without the matching explicit request returns `HUMAN_DECISION_REQUIRED`; do not create artifacts, dispatch roles, or silently raise/downgrade the profile.
 
 Each applicable full-planning role gets one initial pass and at most one targeted rerun after an invalidating plan change. A second rerun, a new role, or a restart requires `HUMAN_DECISION_REQUIRED`.

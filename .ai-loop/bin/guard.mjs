@@ -15,6 +15,10 @@ const planningRoles = new Set([
 const programmingRoles = new Set(["implementer", "reviewer", "fixer"]);
 const actions = new Set(["validate-state", "dispatch-role", "run-check", "extend-budget", "finalize"]);
 const programmingRank = { direct: 0, light: 1, guarded: 2, full: 3 };
+const fullPlanningRequests = new Set(["full-planning-loop", "full-planning-and-programming-loop"]);
+const fullProgrammingRequests = new Set([
+  "full-programming-loop", "full-planning-and-programming-loop", "full-qa-until-pass",
+]);
 const hardEffects = new Set(Object.values(policy.planning.hard_effects).flatMap((category) => Object.keys(category)));
 const actionArgs = {
   "validate-state": { required: ["state", "action", "decision"], optional: [] },
@@ -92,21 +96,36 @@ function requiredProgrammingProfile(decision) {
       : facts.independence_need === "independent_review" ? "light" : "direct";
   const request = decision.explicit_loop_request;
   if (request === "light-programming-loop" && programmingRank[requiredProfile] > programmingRank.light) {
-    return { blocked: true, profile: requiredProfile };
+    return { blocked: true, profile: requiredProfile, reason: "LIGHT_PROFILE_CEILING" };
   }
-  if (request === "full-programming-loop" || request === "full-qa-until-pass") requiredProfile = "full";
+  if (requiredProfile === "full" && !fullProgrammingRequests.has(request)) {
+    return { blocked: true, profile: "full", reason: "FULL_PROGRAMMING_OPT_IN_REQUIRED" };
+  }
+  if (fullProgrammingRequests.has(request)) requiredProfile = "full";
   if (request === "programming-loop" || request === "light-programming-loop") {
     requiredProfile = programmingRank[requiredProfile] < programmingRank.light ? "light" : requiredProfile;
   }
-  return { blocked: false, profile: requiredProfile };
+  return { blocked: false, profile: requiredProfile, reason: null };
 }
 function validateDecisionAdmission(state, decision, action) {
+  if (state.loop_type === "planning") {
+    if (decision.planning_profile === "full" && !fullPlanningRequests.has(decision.explicit_loop_request)) {
+      human(
+        state,
+        action,
+        "FULL_PLANNING_OPT_IN_REQUIRED",
+        "full-planning-requires-explicit-user-opt-in",
+        "Full Planning requires an explicit current-dialog full Planning request.",
+      );
+    }
+    return;
+  }
   const derived = requiredProgrammingProfile(decision);
   if (derived.blocked || decision.programming_profile !== derived.profile) {
     human(
       state,
       action,
-      derived.blocked ? "LIGHT_PROFILE_CEILING" : "DECISION_ADMISSION_MISMATCH",
+      derived.blocked ? derived.reason : "DECISION_ADMISSION_MISMATCH",
       "programming-profile-derived-from-decision-facts",
       `Decision facts/request require ${derived.profile}, not ${decision.programming_profile}.`,
     );

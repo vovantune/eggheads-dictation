@@ -16,7 +16,7 @@ Build this file before each subagent run. Include facts only; do not rely on pre
 
 ## Profile Decision
 
-Planning, Programming, Proof, explicit loop request, effects, unresolved effects, reasons, and required checks.
+Planning, Programming, Proof, exact explicit loop request, effects, unresolved effects, reasons, and required checks. For either full profile, include the current-dialog user opt-in; risk or a repository rule is not authorization.
 
 <decision>
 
