@@ -71,6 +71,7 @@ OpenWhispr is an Electron-based desktop dictation application that uses whisper.
 - Do not use manual/copy-paste fallback and do not simulate independent QA as sequential roles of one agent.
 - For medium/large tasks, first research context, then UX for user-visible changes, then design/spec; start implementation only after explicit user confirmation.
 - For tasks with broad reading, 3+ independent areas, UI QA, release/build risk, or work longer than 10-15 minutes, use subagents when the current mode allows it.
+- The Claude Code client injects a `heron_brook` system-prompt section carrying `Do not call the AgentTool unless the user requested it`. It overrides user configuration, including an explicit `allow` for `Task`, and has no official opt-out (anthropics/claude-code#80988). While that holds: if a task benefits from parallel subagents, say so in one line up front — how many, over which areas, and why — and wait for approval. One approval covers the rest of the current task; do not ask again per launch. Temporary workaround, remove once the client is fixed.
 - The main agent keeps scope, decisions, and final integration; give subagents only narrow independent tasks such as entrypoint search, module analysis, review, risk check, or verification.
 - Do not delegate sequential chains or parallel edits to the same file.
 - Ask subagents for concise findings: important files, facts, risks, recommendations; no large code dumps or raw logs.
