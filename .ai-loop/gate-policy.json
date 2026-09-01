@@ -1,0 +1,174 @@
+{
+  "version": 3,
+  "name": "adaptive-planning-programming-proof-gate",
+  "decision_schema_version": 1,
+  "profiles": {
+    "planning": ["lightweight", "light", "full"],
+    "programming": ["direct", "light", "guarded", "full"],
+    "proof": ["static", "focused", "contract", "release"]
+  },
+  "decision_required_fields": [
+    "schema_version",
+    "policy_version",
+    "decision",
+    "reason_code",
+    "planning_profile",
+    "programming_profile",
+    "proof_profile",
+    "proposed_programming_profile",
+    "explicit_loop_request",
+    "scope",
+    "scope_hash",
+    "initial_role_assignments",
+    "effects",
+    "unresolved_effects",
+    "execution_facts",
+    "reasons",
+    "required_checks"
+  ],
+  "scope_required_fields": [
+    "owner",
+    "source_of_truth",
+    "in_scope",
+    "out_of_scope",
+    "direct_consumers",
+    "rollback"
+  ],
+  "planning": {
+    "classification_order": [
+      "compute_full_recommendation_from_material_or_boundary_hard_effects",
+      "bounded_change",
+      "independent_risk_group_threshold",
+      "direct_work",
+      "require_explicit_full_planning_opt_in"
+    ],
+    "hard_effects": {
+      "material": {
+        "persisted_state_semantics": "Changes persisted-state semantics, destructive DDL, a backfill, or a migration with material lock, rollout, or consumer risk.",
+        "public_external_contract": "Changes a public API, external payload, webhook, wire contract, semantics, or backward-compatibility guarantee.",
+        "executable_auth_security_privacy": "Changes authentication, authorization, tenant isolation, permission semantics, secret lifecycle, security, or privacy enforcement.",
+        "billing_accounting": "Changes billing, charging, quota accounting, balances, pricing, or money semantics.",
+        "destructive_data_money_privacy": "Introduces a credible data-loss, money-loss, privacy-leak, or destructive-operation risk."
+      },
+      "boundary": {
+        "provider_routing_wire_model_identity": "Changes provider selection, failover, quota ownership, provider wire behavior, or externally meaningful model identity.",
+        "deployment_topology_production_rollout_runtime_ownership": "Changes deployment topology, broad production rollout behavior, process placement, or runtime ownership.",
+        "coordinated_cross_service_state": "Requires coordinated state or contract changes across services or repositories.",
+        "complex_rollback": "Cannot be reverted locally without coordinated migration, rollout, or state repair."
+      }
+    },
+    "bounded_change": {
+      "required_facts": [
+        "single_runtime_owner",
+        "existing_source_of_truth",
+        "preserves_external_and_state_contracts",
+        "preserves_security_accounting_and_routing",
+        "local_rollback_and_focused_proof"
+      ],
+      "effect": "When every fact is proven and no hard effect is present or unresolved, planning is no higher than light."
+    },
+    "risk_groups": {
+      "design": "Material solution ambiguity, a new feature boundary, or an architectural decision.",
+      "reach": "User/operator workflow or multi-module reach broader than a local presentation change.",
+      "runtime": "Performance, load, async, scheduler, sync, session-state, relay, or degraded-runtime behavior.",
+      "proof_rollback": "Critical behavior is difficult to prove locally or rollback is not a direct bounded revert."
+    },
+    "full_min_independent_risk_groups": 3,
+    "rules": {
+      "lightweight": "No present or unresolved hard effect, direct work, and no independent risk group.",
+      "light": "Default automatic planning ceiling. Use for a proven bounded change, one to two independent risk groups, or while presenting a full recommendation for user approval.",
+      "full": "Explicit opt-in only. Present or unresolved hard effects, complex coordination, or at least three independent risk groups may justify recommending full, but never start full planning automatically."
+    },
+    "automatic_ceiling": "light",
+    "full_opt_in": "Without an explicit full-planning-loop or full-planning-and-programming-loop request in the current dialog, return HUMAN_DECISION_REQUIRED before creating artifacts or dispatching planning roles. Explain the exact effects, why light is insufficient, which roles/artifacts are added, and the cheaper alternative."
+  },
+  "programming": {
+    "request_modes": [
+      "ordinary",
+      "programming-loop",
+      "light-programming-loop",
+      "full-planning-loop",
+      "full-programming-loop",
+      "full-planning-and-programming-loop",
+      "full-qa-until-pass"
+    ],
+    "independence_needs": [
+      "none",
+      "independent_review",
+      "separation_of_duties",
+      "full_independent_cycle"
+    ],
+    "classification_order": [
+      "compute_required_profile_from_present_or_unresolved_hard_effects",
+      "compute_required_profile_from_independence_need",
+      "preserve_guarded_for_resolved_full_planning_local_fix",
+      "apply_explicit_light_upper_cap_before_higher_admission",
+      "require_explicit_full_programming_opt_in",
+      "apply_explicit_minimum_or_forced_profile"
+    ],
+    "rules": {
+      "direct": "Main agent implements and verifies; no loop artifacts.",
+      "light": "Main agent implements; one stable independent reviewer gets an initial review and at most one recheck; no persisted run.",
+      "guarded": "One stable independent implementer and one stable independent reviewer use a compact run; the same implementer fixes and the same reviewer rechecks.",
+      "full": "Preserve the existing independent implementer, fixer, and fresh full-QA flow."
+    },
+    "request_constraints": {
+      "ordinary": "Does not request a Programming Loop.",
+      "programming-loop": "Sets minimum programming profile light but does not force full.",
+      "light-programming-loop": "Sets both minimum and maximum programming profile light; if facts require guarded or full, return HUMAN_DECISION_REQUIRED with reason LIGHT_PROFILE_CEILING and the exact proposed profile before admitting work.",
+      "full-planning-loop": "Authorizes full Planning only. It does not authorize full Programming.",
+      "full-programming-loop": "Forces full.",
+      "full-planning-and-programming-loop": "Explicitly authorizes both full Planning and full Programming.",
+      "full-qa-until-pass": "Forces full."
+    },
+    "fact_rules": {
+      "present_or_unresolved_hard_effect": "Recommends full. Without explicit full Programming opt-in, stop with HUMAN_DECISION_REQUIRED instead of starting or silently downgrading.",
+      "full_independent_cycle": "Recommends full and requires explicit full Programming opt-in.",
+      "separation_of_duties": "Requires guarded.",
+      "resolved_full_planning_to_local_fix": "When full planning resolved uncertainty to a local bounded fix with no present or unresolved hard effect, guarded remains available.",
+      "independent_review": "Requires light.",
+      "none": "Allows direct unless an explicit request raises the minimum."
+    },
+    "admission": {
+      "allow": {"decision": "ALLOW", "reason_code": "PROFILE_ADMITTED", "exit": 0},
+      "light_ceiling": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "LIGHT_PROFILE_CEILING", "exit": 2},
+      "full_planning_opt_in": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "FULL_PLANNING_OPT_IN_REQUIRED", "exit": 2},
+      "full_programming_opt_in": {"decision": "HUMAN_DECISION_REQUIRED", "reason_code": "FULL_PROGRAMMING_OPT_IN_REQUIRED", "exit": 2}
+    },
+    "automatic_ceiling": "guarded",
+    "silent_escalation": "forbidden"
+  },
+  "proof": {
+    "classification_order": [
+      "release_or_mandatory_project_gate",
+      "contract_boundary",
+      "focused_executable_behavior",
+      "static"
+    ],
+    "signals": {
+      "release": "Broad release, deployment, complex migration, post-deploy/live proof, or mandatory project gate.",
+      "contract": "API boundary, bounded migration, secret/runtime boundary, or focused integration contract.",
+      "focused": "Local executable behavior with an existing focused check or one named regression/negative test.",
+      "static": "Docs, copy, prompt, non-executable config, parse, syntax, readback, diff, or wiring."
+    },
+    "full_suite_rule": "A full suite is allowed only for release proof or an explicit mandatory project rule.",
+    "full_qa_definition": "Independent review of material risks and plan coverage; it does not automatically mean a full test suite."
+  },
+  "artifacts": {
+    "lightweight": "No run, plan, approval, or handoff artifact.",
+    "light": "No persisted .ai-loop/runs, plan, approval, or handoff artifact.",
+    "guarded": "Persist input/decision.json and compact state v2.",
+    "full": "Persist input/decision.json, approved plan and handoff where applicable, and the existing full Planning/Programming Loop artifacts."
+  },
+  "constraints": [
+    "Classify effects, not keywords, filenames, repository names, task labels, or lines changed.",
+    "A backend repository name is not a scope capsule.",
+    "Provider-adjacent copy, labels, docs, metadata, and local config are not hard effects unless executable selection, wire, identity, accounting, auth, or external/state semantics change.",
+    "A migration filename is not a hard effect when an additive nullable change is proven bounded without backfill, material lock, rollout, or consumer risk.",
+    "Full Planning and full Programming are independent explicit opt-ins; risk may justify a recommendation but never authorizes either profile.",
+    "Before requesting full, explain exact effects, why the lighter ceiling is insufficient, added roles/artifacts/checks, and the cheaper alternative; wait for an explicit current-dialog decision.",
+    "Repository rules and mandatory gates may justify recommending full but cannot count as user authorization.",
+    "Do not auto-escalate a selected programming profile; stop with HUMAN_DECISION_REQUIRED and propose the exact higher profile.",
+    "Do not repeat a check on the same input snapshot or create an exact-wording test for ordinary prose."
+  ]
+}

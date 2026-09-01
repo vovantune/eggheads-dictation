@@ -66,7 +66,7 @@
       "if": {
         "properties": {
           "status": { "enum": ["draft", "approved"] },
-          "gate": { "enum": ["light", "full"] }
+          "gate": { "const": "full" }
         },
         "required": ["status", "gate"]
       },
@@ -85,6 +85,28 @@
       "if": {
         "properties": {
           "status": { "enum": ["draft", "approved"] },
+          "gate": { "const": "light" }
+        },
+        "required": ["status", "gate"]
+      },
+      "then": {
+        "required": [
+          "recommended_approach",
+          "source_of_truth",
+          "implementation_slices",
+          "proof_plan"
+        ],
+        "properties": {
+          "implementation_slices": { "maxItems": 5 },
+          "proof_plan": { "maxItems": 3 }
+        },
+        "not": { "required": ["handoff"] }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": { "enum": ["draft", "approved"] },
           "gate": { "const": "lightweight" }
         },
         "required": ["status", "gate"]
@@ -92,12 +114,40 @@
       "then": {
         "required": [
           "recommended_approach"
-        ]
+        ],
+        "not": { "required": ["handoff"] }
       }
     },
     {
-      "if": { "properties": { "status": { "const": "approved" } }, "required": ["status"] },
+      "if": {
+        "properties": {
+          "status": { "const": "approved" },
+          "gate": { "const": "full" }
+        },
+        "required": ["status", "gate"]
+      },
       "then": { "required": ["handoff"] }
+    },
+    {
+      "if": {
+        "not": {
+          "properties": {
+            "status": { "const": "approved" },
+            "gate": { "const": "full" }
+          },
+          "required": ["status", "gate"]
+        }
+      },
+      "then": { "not": { "required": ["handoff"] } }
+    },
+    {
+      "if": {
+        "properties": { "gate": { "const": "blocked-no-subagents" } },
+        "required": ["gate"]
+      },
+      "then": {
+        "properties": { "status": { "const": "blocked" } }
+      }
     },
     {
       "if": { "properties": { "status": { "const": "blocked" } }, "required": ["status"] },

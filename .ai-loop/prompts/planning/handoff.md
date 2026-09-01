@@ -1,6 +1,6 @@
 # Planning Loop Handoff Prompt
 
-After user approval, save the approved plan and prepare Programming Loop handoff.
+After user approval of a `full` plan, save the approved plan and prepare Programming Loop handoff. `light` and `lightweight` never use this prompt.
 
 Required artifacts:
 
@@ -19,4 +19,4 @@ Append the planning run path when available.
 
 If the user message starts with `PLEASE IMPLEMENT THIS PLAN:`, treat it as a Codex plan-button approval event. Save the plan text after the marker into `plans/<task-slug>.md`, write the handoff artifacts, and do not begin implementation in the current planning thread.
 
-If the runtime can create a clean session, create it and send the prompt there. If it cannot, stop and show the exact handoff prompt instead of starting implementation in the planning context.
+Create a clean session only when it can read the same checkout, approved plan, and handoff trace. For a separate worktree, explicitly copy both artifacts and verify that the target paths are readable before sending the prompt. Otherwise stop and show the exact handoff prompt instead of starting implementation in the planning context.

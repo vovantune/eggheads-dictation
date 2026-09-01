@@ -10,6 +10,8 @@ Important findings are:
 - `critical`
 - `major`
 
+Only unresolved severity listed by canonical `gate.fail_on_severity` triggers fixing. `minor` and `nit` may remain as documented residual findings and do not by themselves launch or prolong a fixer pass.
+
 Required behavior:
 
 - Fix the root cause, not only the symptom.

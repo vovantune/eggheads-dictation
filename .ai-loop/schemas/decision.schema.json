@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eggheads.local/schemas/ai-loop-decision-v1.json",
+  "title": "Adaptive Loop v3 Decision Baseline",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "policy_version",
+    "decision",
+    "reason_code",
+    "planning_profile",
+    "programming_profile",
+    "proof_profile",
+    "proposed_programming_profile",
+    "explicit_loop_request",
+    "scope",
+    "scope_hash",
+    "initial_role_assignments",
+    "effects",
+    "unresolved_effects",
+    "execution_facts",
+    "reasons",
+    "required_checks"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "policy_version": {"type": "integer", "const": 3},
+    "decision": {"enum": ["ALLOW", "HUMAN_DECISION_REQUIRED"]},
+    "reason_code": {"type": "string", "minLength": 1},
+    "planning_profile": {"enum": ["lightweight", "light", "full"]},
+    "programming_profile": {"enum": ["direct", "light", "guarded", "full"]},
+    "proof_profile": {"enum": ["static", "focused", "contract", "release"]},
+    "proposed_programming_profile": {
+      "type": ["string", "null"],
+      "enum": ["direct", "light", "guarded", "full", null]
+    },
+    "explicit_loop_request": {
+      "enum": [
+        "ordinary",
+        "programming-loop",
+        "light-programming-loop",
+        "full-planning-loop",
+        "full-programming-loop",
+        "full-planning-and-programming-loop",
+        "full-qa-until-pass"
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "required": ["owner", "source_of_truth", "in_scope", "out_of_scope", "direct_consumers", "rollback"],
+      "additionalProperties": false,
+      "properties": {
+        "owner": {"type": "string", "minLength": 1},
+        "source_of_truth": {"type": "string", "minLength": 1},
+        "in_scope": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "out_of_scope": {"type": "array", "items": {"type": "string"}},
+        "direct_consumers": {"type": "array", "items": {"type": "string"}},
+        "rollback": {"type": "string", "minLength": 1}
+      }
+    },
+    "scope_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "initial_role_assignments": {
+      "type": "object",
+      "required": ["implementer", "reviewer", "fixer"],
+      "additionalProperties": false,
+      "properties": {
+        "implementer": {"type": ["string", "null"], "minLength": 1},
+        "reviewer": {"type": ["string", "null"], "minLength": 1},
+        "fixer": {"type": ["string", "null"], "minLength": 1}
+      }
+    },
+    "effects": {"type": "array", "items": {"type": "string"}},
+    "unresolved_effects": {"type": "array", "items": {"type": "string"}},
+    "execution_facts": {
+      "type": "object",
+      "required": ["independence_need", "resolved_full_planning_to_local_fix"],
+      "additionalProperties": false,
+      "properties": {
+        "independence_need": {
+          "enum": ["none", "independent_review", "separation_of_duties", "full_independent_cycle"]
+        },
+        "resolved_full_planning_to_local_fix": {"type": "boolean"}
+      }
+    },
+    "reasons": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "required_checks": {"type": "array", "items": {"type": "string"}}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"programming_profile": {"const": "direct"}}},
+      "then": {
+        "properties": {
+          "initial_role_assignments": {
+            "properties": {
+              "implementer": {"type": "null"},
+              "reviewer": {"type": "null"},
+              "fixer": {"type": "null"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"programming_profile": {"const": "light"}}},
+      "then": {
+        "properties": {
+          "initial_role_assignments": {
+            "properties": {
+              "implementer": {"type": "null"},
+              "reviewer": {"type": "string", "minLength": 1},
+              "fixer": {"type": "null"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"programming_profile": {"const": "guarded"}}},
+      "then": {
+        "properties": {
+          "initial_role_assignments": {
+            "properties": {
+              "implementer": {"type": "string", "minLength": 1},
+              "reviewer": {"type": "string", "minLength": 1},
+              "fixer": {"type": "null"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"programming_profile": {"const": "full"}}},
+      "then": {
+        "properties": {
+          "initial_role_assignments": {
+            "properties": {
+              "implementer": {"type": "string", "minLength": 1},
+              "reviewer": {"type": "string", "minLength": 1},
+              "fixer": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      }
+    }
+  ]
+}

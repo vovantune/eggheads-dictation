@@ -1,15 +1,32 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://eggheads.local/ai-loop/loop-state.schema.json",
-  "title": "AI Loop State",
+  "title": "AI Loop State v2",
+  "description": "Schema v2 is required for new guarded/full runs and transient light guard snapshots. Historical completed v1 runs remain read-only and are not migrated.",
   "type": "object",
-  "required": ["schema_version", "loop_id", "loop_type", "status", "iteration", "gate"],
+  "required": [
+    "schema_version",
+    "loop_id",
+    "loop_type",
+    "status",
+    "iteration",
+    "decision_hash",
+    "profiles",
+    "scope",
+    "role_assignments",
+    "budget",
+    "extensions",
+    "current_snapshot_id",
+    "checks",
+    "activity",
+    "gate"
+  ],
   "additionalProperties": false,
   "properties": {
-    "schema_version": { "const": 1 },
-    "loop_id": { "type": "string", "minLength": 1 },
-    "loop_type": { "enum": ["programming", "planning"] },
-    "runtime": { "type": "string" },
+    "schema_version": {"const": 2},
+    "loop_id": {"type": "string", "minLength": 1},
+    "loop_type": {"enum": ["programming", "planning"]},
+    "runtime": {"type": "string"},
     "status": {
       "enum": [
         "PRECHECK",
@@ -32,86 +49,306 @@
         "HUMAN_DECISION_REQUIRED"
       ]
     },
-    "iteration": { "type": "integer", "minimum": 0 },
-    "task_title": { "type": "string" },
-    "approved_plan_path": { "type": "string" },
-    "source_planning_run": { "type": "string" },
-    "handoff_prompt_path": { "type": "string" },
-    "planning": {
+    "iteration": {"type": "integer", "minimum": 0},
+    "decision_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "task_title": {"type": "string"},
+    "approved_plan_path": {"type": "string"},
+    "source_planning_run": {"type": "string"},
+    "handoff_prompt_path": {"type": "string"},
+    "profiles": {
       "type": "object",
+      "required": ["planning", "programming", "proof"],
       "additionalProperties": false,
       "properties": {
-        "gate": { "enum": ["lightweight", "light", "full", "blocked-no-subagents"] },
-        "context_pack_path": { "type": "string" },
-        "final_plan_path": { "type": "string" },
-        "approved_plan_path": { "type": "string" },
-        "handoff_prompt_path": { "type": "string" },
-        "planners": {
-          "type": "array",
-          "items": { "type": "string", "minLength": 1 }
-        },
-        "reviewers": {
-          "type": "array",
-          "items": { "type": "string", "minLength": 1 }
+        "planning": {"enum": ["lightweight", "light", "full"]},
+        "programming": {"enum": ["direct", "light", "guarded", "full"]},
+        "proof": {"enum": ["static", "focused", "contract", "release"]}
+      }
+    },
+    "scope": {
+      "type": "object",
+      "required": [
+        "owner",
+        "source_of_truth",
+        "in_scope",
+        "out_of_scope",
+        "direct_consumers",
+        "rollback",
+        "scope_hash",
+        "approval"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "owner": {"type": "string", "minLength": 1},
+        "source_of_truth": {"type": "string", "minLength": 1},
+        "in_scope": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "out_of_scope": {"type": "array", "items": {"type": "string"}},
+        "direct_consumers": {"type": "array", "items": {"type": "string"}},
+        "rollback": {"type": "string", "minLength": 1},
+        "scope_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "approval": {
+          "type": "object",
+          "required": ["approved_hash", "approval_evidence", "approved_at"],
+          "additionalProperties": false,
+          "properties": {
+            "approved_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+            "approval_evidence": {"type": "string", "pattern": "^current-dialog:.+"},
+            "approved_at": {"type": "string", "minLength": 1}
+          }
         }
+      }
+    },
+    "role_assignments": {
+      "type": "object",
+      "required": ["implementer", "reviewer", "fixer", "changes"],
+      "additionalProperties": false,
+      "properties": {
+        "implementer": {"type": ["string", "null"], "minLength": 1},
+        "reviewer": {"type": ["string", "null"], "minLength": 1},
+        "fixer": {"type": ["string", "null"], "minLength": 1},
+        "changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["role", "from", "to", "reason", "changed_at"],
+            "additionalProperties": false,
+            "properties": {
+              "role": {"enum": ["implementer", "reviewer", "fixer"]},
+              "from": {"type": ["string", "null"]},
+              "to": {"type": "string", "minLength": 1},
+              "reason": {"type": "string", "minLength": 1},
+              "changed_at": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "required": [
+        "base_max_iterations",
+        "active_max_iterations",
+        "planning_role_reruns",
+        "light_review_passes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "base_max_iterations": {"type": "integer", "const": 5},
+        "active_max_iterations": {"type": "integer", "minimum": 5},
+        "planning_role_reruns": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "light_review_passes": {"type": "integer", "minimum": 0, "maximum": 2}
+      }
+    },
+    "extensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "previous_limit",
+          "new_limit",
+          "approval_evidence",
+          "approved_at",
+          "post_ten_decision"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "previous_limit": {"type": "integer", "minimum": 5},
+          "new_limit": {"type": "integer", "minimum": 6},
+          "approval_evidence": {"type": "string", "pattern": "^current-dialog:.+"},
+          "approved_at": {"type": "string", "minLength": 1},
+          "post_ten_decision": {"type": "boolean"}
+        }
+      }
+    },
+    "current_snapshot_id": {"type": "string", "minLength": 1},
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "tier",
+          "snapshot_id",
+          "status",
+          "invalidated_by",
+          "suite",
+          "mandatory_project_rule"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "tier": {"enum": ["static", "focused", "contract", "release"]},
+          "snapshot_id": {"type": "string", "minLength": 1},
+          "status": {"enum": ["not_run", "passed", "failed", "unavailable", "accepted_unavailable"]},
+          "invalidated_by": {"type": ["string", "null"]},
+          "suite": {"enum": ["none", "focused", "full"]},
+          "mandatory_project_rule": {"type": "boolean"},
+          "command_or_procedure": {"type": "string"},
+          "failure_mode_caught": {"type": "string"},
+          "invalidation_triggers": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "activity": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["sequence", "type", "iteration", "snapshot_id", "artifact_ref"],
+        "additionalProperties": false,
+        "properties": {
+          "sequence": {"type": "integer", "minimum": 1},
+          "type": {"enum": ["planning", "implementation", "review", "fix", "qa"]},
+          "iteration": {"type": "integer", "minimum": 1},
+          "snapshot_id": {"type": "string", "minLength": 1},
+          "artifact_ref": {"type": "string", "minLength": 1},
+          "actor_id": {"type": "string", "minLength": 1},
+          "verdict": {"enum": ["pass", "fail", "needs_human"]},
+          "role": {
+            "enum": [
+              "planner-minimal",
+              "planner-reuse",
+              "planner-ops",
+              "planner-ux",
+              "reviewer-yagni-scope",
+              "reviewer-evidence-contract",
+              "reviewer-project-dod"
+            ]
+          },
+          "pass": {"enum": ["initial", "rerun"]}
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"type": {"const": "planning"}}},
+            "then": {"required": ["role", "pass"]}
+          }
+        ]
+      }
+    },
+    "final": {
+      "type": "object",
+      "required": ["verdict", "source_qa_iteration", "source_qa_ref", "plan_coverage_complete"],
+      "additionalProperties": false,
+      "properties": {
+        "verdict": {"enum": ["pass", "fail", "needs_human"]},
+        "source_qa_iteration": {"type": "integer", "minimum": 1},
+        "source_qa_ref": {"type": "string", "minLength": 1},
+        "plan_coverage_complete": {"type": "boolean"}
       }
     },
     "gate": {
       "type": "object",
-      "required": ["fail_on_severity", "max_iterations"],
+      "required": ["fail_on_severity"],
       "additionalProperties": false,
       "properties": {
         "fail_on_severity": {
           "type": "array",
-          "items": { "enum": ["blocker", "critical", "major", "minor", "nit"] },
+          "items": {"enum": ["blocker", "critical", "major", "minor", "nit"]},
           "minItems": 1,
           "uniqueItems": true
-        },
-        "max_iterations": { "type": "integer", "minimum": 1 }
+        }
       }
     },
     "capabilities": {
       "type": "object",
-      "additionalProperties": { "type": "boolean" }
+      "additionalProperties": {"type": "boolean"}
     },
     "open_findings": {
       "type": "array",
-      "items": { "$ref": "#/$defs/finding" },
+      "items": {"$ref": "#/$defs/finding"},
       "default": []
-    },
-    "checks": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "status": { "enum": ["not_run", "passed", "failed", "unavailable", "accepted_unavailable"] },
-        "commands": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "last_log_path": { "type": "string" }
-      }
     },
     "human_decision": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "required": { "type": "boolean" },
-        "reason": { "type": "string" }
+        "required": {"type": "boolean"},
+        "reason": {"type": "string"},
+        "proposed_profile": {"enum": ["direct", "light", "guarded", "full"]}
       }
     }
   },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "PASSED"}}},
+      "then": {"required": ["final"]}
+    },
+    {
+      "if": {"properties": {"profiles": {"properties": {"programming": {"const": "direct"}}}}},
+      "then": {
+        "properties": {
+          "role_assignments": {
+            "properties": {
+              "implementer": {"type": "null"},
+              "reviewer": {"type": "null"},
+              "fixer": {"type": "null"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"profiles": {"properties": {"programming": {"const": "light"}}}}},
+      "then": {
+        "properties": {
+          "role_assignments": {
+            "properties": {
+              "implementer": {"type": "null"},
+              "fixer": {"type": "null"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"profiles": {"properties": {"programming": {"const": "guarded"}}}}},
+      "then": {
+        "properties": {
+          "role_assignments": {
+            "required": ["implementer", "reviewer"],
+            "properties": {
+              "implementer": {"type": "string", "minLength": 1},
+              "reviewer": {"type": "string", "minLength": 1},
+              "fixer": {"type": "null"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"profiles": {"properties": {"programming": {"const": "full"}}}}},
+      "then": {
+        "properties": {
+          "role_assignments": {
+            "required": ["implementer", "reviewer", "fixer"],
+            "properties": {
+              "implementer": {"type": "string", "minLength": 1},
+              "reviewer": {"type": "string", "minLength": 1},
+              "fixer": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "finding": {
       "type": "object",
       "required": ["id", "severity", "summary", "blocking"],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string" },
-        "severity": { "enum": ["blocker", "critical", "major", "minor", "nit"] },
-        "summary": { "type": "string" },
-        "file": { "type": "string" },
-        "blocking": { "type": "boolean" },
-        "status": { "enum": ["open", "fixed", "accepted_non_blocking", "needs_human"] }
+        "id": {"type": "string"},
+        "severity": {"enum": ["blocker", "critical", "major", "minor", "nit"]},
+        "summary": {"type": "string"},
+        "file": {"type": "string"},
+        "blocking": {"type": "boolean"},
+        "status": {"enum": ["open", "fixed", "accepted_non_blocking", "needs_human"]}
       }
     }
   }

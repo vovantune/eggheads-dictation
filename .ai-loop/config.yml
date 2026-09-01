@@ -1,5 +1,25 @@
-version: 1
+version: 2
 runtime_contract: universal-chat-native-loop
+planning_gate_policy: 3
+
+profiles:
+  planning:
+    - lightweight
+    - light
+    - full
+  programming:
+    - direct
+    - light
+    - guarded
+    - full
+  proof:
+    - static
+    - focused
+    - contract
+    - release
+
+admission_guard: .ai-loop/bin/guard.mjs
+decision_schema: .ai-loop/schemas/decision.schema.json
 
 storage:
   root: .ai-loop
@@ -15,11 +35,14 @@ loop_types:
       context_pack: .ai-loop/prompts/shared/context-pack.md
       subagent_contract: .ai-loop/prompts/shared/subagent-contract.md
       implementer: .ai-loop/prompts/programming/implementer.md
+      compact_reviewer: .ai-loop/prompts/programming/compact-reviewer.md
       reviewer: .ai-loop/prompts/programming/qa-reviewer.md
       fixer: .ai-loop/prompts/programming/fixer.md
 
   planning:
     document: docs/agent-planning-loop.md
+    gate_policy: .ai-loop/gate-policy.json
+    gate_cases: .ai-loop/gate-cases.json
     state_schema: .ai-loop/schemas/loop-state.schema.json
     planner_schema: .ai-loop/schemas/planning-result.schema.json
     reviewer_schema: .ai-loop/schemas/planning-review-result.schema.json
@@ -41,12 +64,31 @@ loop_types:
       handoff: .ai-loop/prompts/planning/handoff.md
 
 capabilities:
-  required:
-    - spawn_independent_subagent
-    - read_subagent_result
-    - persist_loop_state
-    - read_workspace_snapshot
-    - run_checks_or_record_unavailable_policy
+  by_programming_profile:
+    direct: []
+    light:
+      - spawn_independent_reviewer
+      - read_subagent_result
+      - run_admission_guard
+      - transient_decision_state_outside_runs
+      - run_checks_or_record_unavailable_policy
+    guarded:
+      - spawn_independent_implementer
+      - spawn_independent_reviewer
+      - read_subagent_result
+      - persist_loop_state_v2
+      - read_workspace_snapshot
+      - run_admission_guard
+      - run_checks_or_record_unavailable_policy
+    full:
+      - spawn_independent_implementer
+      - spawn_independent_reviewer
+      - spawn_independent_fixer
+      - read_subagent_result
+      - persist_loop_state_v2
+      - read_workspace_snapshot
+      - run_admission_guard
+      - run_checks_or_record_unavailable_policy
 
 gate:
   fail_on_severity:
@@ -54,6 +96,8 @@ gate:
     - critical
     - major
   max_iterations: 5
+  light_review_passes: 2
+  planning_role_reruns: 1
 
 checks:
   source: project_rules
