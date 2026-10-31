@@ -6,216 +6,190 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "utf8");
 const readJson = (relativePath) => JSON.parse(read(relativePath));
-const profiles = (policy, scenario) => {
-  const hard = new Set(
-    Object.values(policy.planning.hard_effects).flatMap((group) => Object.keys(group))
-  );
-  const risks = new Set(Object.keys(policy.planning.risk_groups));
-  const observedHard = [...scenario.hard_effects, ...scenario.unresolved_effects];
-  assert.ok(observedHard.every((effect) => hard.has(effect)), `${scenario.id}: unknown hard effect`);
-  assert.ok(scenario.risk_groups.every((risk) => risks.has(risk)), `${scenario.id}: unknown risk group`);
+const exists = (relativePath) => fs.existsSync(path.join(root, relativePath));
 
-  const bounded = policy.planning.bounded_change.required_facts.every((fact) =>
-    scenario.bounded_facts.includes(fact)
-  );
-  const riskCount = new Set(scenario.risk_groups).size;
-  const request = scenario.request_mode;
-  const stage = scenario.workflow_stage || "programming";
-  const fullPlanningRecommended =
-    observedHard.length > 0 ||
-    (!bounded && riskCount >= policy.planning.full_min_independent_risk_groups);
-  const fullPlanningAuthorized = [
-    "full-planning-loop",
-    "full-planning-and-programming-loop",
-  ].includes(request);
-  let planning;
-  if (fullPlanningAuthorized) planning = "full";
-  else if (fullPlanningRecommended) planning = "light";
-  else if (bounded) planning = scenario.direct_work && riskCount === 0 ? "lightweight" : "light";
-  else planning = scenario.direct_work && riskCount === 0 ? "lightweight" : "light";
-
-  const execution = scenario.execution_facts;
-  const independence = execution.independence_need;
-  let requiredProgramming = "direct";
-  if (observedHard.length || independence === "full_independent_cycle") {
-    requiredProgramming = "full";
-  } else if (independence === "separation_of_duties") {
-    requiredProgramming = "guarded";
-  } else if (execution.resolved_full_planning_to_local_fix && planning === "full") {
-    requiredProgramming = "guarded";
-  } else if (independence === "independent_review") {
-    requiredProgramming = "light";
-  }
-
-  const rank = { direct: 0, light: 1, guarded: 2, full: 3 };
-  let programming = requiredProgramming;
-  let decision = "ALLOW";
-  let reasonCode = "PROFILE_ADMITTED";
-  let proposedProgrammingProfile = null;
-  let exit = 0;
-  if (request === "light-programming-loop" && rank[requiredProgramming] > rank.light) {
-    programming = "light";
-    decision = "HUMAN_DECISION_REQUIRED";
-    reasonCode = "LIGHT_PROFILE_CEILING";
-    proposedProgrammingProfile = requiredProgramming;
-    exit = 2;
-  } else if (
-    [
-      "full-programming-loop",
-      "full-planning-and-programming-loop",
-      "full-qa-until-pass",
-    ].includes(request)
-  ) {
-    programming = "full";
-  } else if (requiredProgramming === "full") {
-    programming = "guarded";
-    proposedProgrammingProfile = "full";
-    if (stage === "programming") {
-      decision = "HUMAN_DECISION_REQUIRED";
-      reasonCode = "FULL_PROGRAMMING_OPT_IN_REQUIRED";
-      exit = 2;
-    }
-  } else if (
-    ["programming-loop", "light-programming-loop"].includes(request) &&
-    rank[programming] < rank.light
-  ) {
-    programming = "light";
-  }
-  if (stage === "planning" && fullPlanningRecommended && !fullPlanningAuthorized) {
-    decision = "HUMAN_DECISION_REQUIRED";
-    reasonCode = "FULL_PLANNING_OPT_IN_REQUIRED";
-    exit = 2;
-  }
-  return {
-    planning,
-    programming,
-    proof: scenario.proof_signal,
-    decision,
-    reason_code: reasonCode,
-    proposed_programming_profile: proposedProgrammingProfile,
-    exit,
-  };
+const walk = (relativePath) => {
+  const absolute = path.join(root, relativePath);
+  if (!fs.existsSync(absolute)) return [];
+  if (fs.statSync(absolute).isFile()) return [relativePath];
+  return fs
+    .readdirSync(absolute)
+    .filter((name) => !["runs", "node_modules"].includes(name))
+    .flatMap((name) => walk(path.join(relativePath, name)));
 };
 
-test("portable cases match all Adaptive Loop v3 profiles", () => {
-  const policy = readJson(".ai-loop/gate-policy.json");
-  const cases = readJson(".ai-loop/gate-cases.json");
-  assert.equal(policy.version, 3);
-  assert.equal(cases.policy_version, 3);
-  for (const scenario of cases.cases) {
-    assert.deepEqual(profiles(policy, scenario), scenario.expected, scenario.id);
+test("agent loop defines modes, stop rules and critical proofs", () => {
+  const loop = read("docs/agent-loop.md");
+
+  for (const mode of ["direct", "light", "critical"]) {
+    assert.match(loop, new RegExp(`^\\| \`${mode}\` \\|`, "m"));
   }
-  assert.deepEqual(
-    new Set(cases.cases.map((scenario) => scenario.expected.planning)),
-    new Set(["lightweight", "light", "full"])
-  );
-  assert.deepEqual(
-    new Set(cases.cases.map((scenario) => scenario.expected.programming)),
-    new Set(["direct", "light", "guarded", "full"])
-  );
-  assert.deepEqual(
-    new Set(cases.cases.map((scenario) => scenario.expected.proof)),
-    new Set(["static", "focused", "contract", "release"])
-  );
-  for (const entry of cases.negative_cases) {
-    assert.ok(["classification", "guard", "policy"].includes(entry.kind), entry.id);
-    assert.equal(typeof entry.input, "object", entry.id);
-    assert.equal(typeof entry.expected, "object", entry.id);
-    assert.ok("decision" in entry.expected, entry.id);
-    assert.ok("reason_code" in entry.expected, entry.id);
-    assert.ok("exit" in entry.expected, entry.id);
-    if (entry.kind === "classification") {
-      assert.deepEqual(profiles(policy, entry.input), entry.expected, entry.id);
-    }
+  for (const stopRule of [
+    "Лимит — 5 проходов QA",
+    "новый чат и сжатие контекста его не обнуляют",
+    "Та же находка или тот же механизм вернулись",
+    "После 10 проходов нужен другой подход",
+    "Новый субагент для QA недоступен",
+  ]) {
+    assert.ok(loop.includes(stopRule), stopRule);
   }
-  assert.ok(
-    cases.negative_cases.some((entry) => entry.id === "sql-orm-bounded-is-not-hard-by-name")
-  );
-  assert.ok(
-    cases.negative_cases.some((entry) => entry.id === "unresolved-hard-effect-precedes-bounded-claim")
-  );
-  assert.ok(
-    policy.constraints.some((constraint) => constraint.includes("exact-wording test for ordinary prose"))
-  );
+  for (const proof of [
+    "state-contract-proof",
+    "external-contract-proof",
+    "authz-isolation-proof",
+    "accounting-proof",
+    "destructive-operation-proof",
+    "provider-routing-proof",
+    "runtime-ownership-proof",
+    "cross-service-contract-proof",
+    "rollback-proof",
+  ]) {
+    assert.match(loop, new RegExp(`^\\| .+ \\| \`${proof}\` \\|$`, "m"));
+  }
 });
 
-test("config wires portable policy, prompts, state v2, and guard", () => {
+test("workflow documents are routed from the rules file", () => {
+  const rules = read("CLAUDE.md");
+
+  for (const document of ["docs/agent-loop.md", "docs/agent-planning-loop.md"]) {
+    assert.ok(rules.includes(`\`${document}\``), document);
+    assert.ok(exists(document), document);
+  }
+  assert.ok(read("docs/agent-loop.md").includes("`.ai-loop/prompts/qa-reviewer.md`"));
+});
+
+test("full planning runs only on the user's direct word", () => {
+  const firstParagraph = read("docs/agent-planning-loop.md").split("\n\n")[1];
+
+  assert.ok(firstParagraph.includes("прямому слову пользователя"));
+  assert.ok(firstParagraph.includes("`docs/agent-loop.md`"));
+});
+
+test("plan button saves the plan before implementation", () => {
+  for (const file of ["docs/agent-planning-loop.md", ".ai-loop/prompts/planning/handoff.md"]) {
+    const text = read(file);
+    assert.ok(text.includes("PLEASE IMPLEMENT THIS PLAN:"), file);
+    assert.ok(text.includes("plans/<task-slug>.md"), file);
+    assert.ok(text.includes("docs/agent-loop.md"), file);
+  }
+});
+
+test("QA reviewer prompt is a full markdown review under this repository's rules", () => {
+  const reviewer = read(".ai-loop/prompts/qa-reviewer.md");
+
+  assert.ok(reviewer.includes("`docs/agent-loop.md`"));
+  assert.ok(reviewer.includes("fresh independent review from the original task"));
+  assert.ok(reviewer.includes("`CLAUDE.md`"));
+  assert.ok(!reviewer.includes("schema"));
+});
+
+test("config references existing runtime files and wires every prompt and schema", () => {
   const config = read(".ai-loop/config.yml");
-  const paths = [
-    ".ai-loop/gate-policy.json",
-    ".ai-loop/gate-cases.json",
-    ".ai-loop/schemas/decision.schema.json",
-    ".ai-loop/schemas/loop-state.schema.json",
-    ".ai-loop/bin/guard.mjs",
-    ".ai-loop/bin/json-schema-validator.mjs",
-    ".ai-loop/prompts/programming/compact-reviewer.md",
-    ".ai-loop/prompts/shared/context-pack.md",
-    ".ai-loop/prompts/planning/context-builder.md",
-    ".ai-loop/prompts/planning/delta-review.md",
-    ".ai-loop/prompts/planning/synthesis.md",
-  ];
-  for (const relativePath of paths) {
-    assert.ok(fs.existsSync(path.join(root, relativePath)), relativePath);
-  }
-  assert.match(config, /^planning_gate_policy: 3$/m);
-  assert.match(config, /admission_guard: \.ai-loop\/bin\/guard\.mjs/);
-  assert.match(config, /compact_reviewer: \.ai-loop\/prompts\/programming\/compact-reviewer\.md/);
+  const paths = [...config.matchAll(/^\s*\w+:\s+((?:\.ai-loop|docs)\/\S+\.\w+)\s*$/gm)].map(
+    (match) => match[1]
+  );
 
-  const schema = readJson(".ai-loop/schemas/loop-state.schema.json");
-  assert.equal(schema.properties.schema_version.const, 2);
-  const decisionSchema = readJson(".ai-loop/schemas/decision.schema.json");
-  assert.equal(decisionSchema.properties.policy_version.const, 3);
-  for (const field of [
-    "decision_hash",
-    "profiles",
-    "scope",
-    "role_assignments",
-    "budget",
-    "extensions",
-    "checks",
-    "activity",
+  for (const required of [
+    "docs/agent-loop.md",
+    "docs/agent-planning-loop.md",
+    ".ai-loop/prompts/qa-reviewer.md",
   ]) {
-    assert.ok(schema.required.includes(field), field);
+    assert.ok(paths.includes(required), required);
   }
-  assert.equal(schema.properties.budget.properties.base_max_iterations.const, 5);
-  assert.equal(schema.properties.budget.properties.light_review_passes.maximum, 2);
+  assert.deepEqual(
+    paths.filter((file) => !exists(file)),
+    []
+  );
+  for (const file of [...walk(".ai-loop/prompts"), ...walk(".ai-loop/schemas")]) {
+    assert.ok(config.includes(file), file);
+  }
 });
 
-test("structured full QA policy is enforced by the guard matrix", () => {
-  const policy = readJson(".ai-loop/gate-policy.json");
-  const cases = readJson(".ai-loop/gate-cases.json");
-  assert.match(policy.programming.rules.full, /fixer/);
-  assert.match(policy.programming.rules.full, /fresh full-QA/);
+test("subagent results cover planning roles only", () => {
+  const schema = readJson(".ai-loop/schemas/subagent-result.schema.json");
+  const contract = read(".ai-loop/prompts/planning/subagent-contract.md");
+
+  assert.deepEqual([...schema.properties.role.enum].sort(), ["planner", "planning_reviewer"]);
+  for (const [role, key] of [
+    ["planner", "planning"],
+    ["planning_reviewer", "planning_review"],
+  ]) {
+    assert.ok(schema.properties[key], key);
+    assert.ok(contract.includes(`role: "${role}"`), role);
+  }
+});
+
+test("final result requires handoff only for an approved full plan", () => {
+  const schema = readJson(".ai-loop/schemas/planning-final-result.schema.json");
+
+  assert.deepEqual([...schema.properties.gate.enum].sort(), ["blocked-no-subagents", "full"]);
+  assert.deepEqual(schema.properties.handoff.required, ["approved_plan_path"]);
+  assert.ok(!schema.required.includes("handoff"));
+  const approved = schema.allOf.filter((rule) => rule.if.properties?.status?.const === "approved");
   assert.deepEqual(
-    cases.negative_cases.find((entry) => entry.id === "preserve-full-fixer-fresh-qa").expected,
-    { decision: "HUMAN_DECISION_REQUIRED", reason_code: "LATEST_QA_NOT_PASSING", exit: 2 }
+    approved.map((rule) => rule.then),
+    [{ required: ["handoff"] }]
+  );
+  const exclusive = schema.allOf.filter((rule) => rule.if.not);
+  assert.deepEqual(
+    exclusive.map((rule) => rule.then),
+    [{ not: { required: ["handoff"] } }]
   );
 });
 
-test("native entrypoint and docs preserve OpenWhispr ownership and DoD", () => {
-  assert.equal(fs.readlinkSync(path.join(root, "AGENTS.md")), "CLAUDE.md");
-  const entrypoint = read("CLAUDE.md");
-  const planning = read("docs/agent-planning-loop.md");
-  const programming = read("docs/agent-programming-loop.md");
-  assert.match(entrypoint, /Planning: lightweight\|light\|full/);
-  assert.match(entrypoint, /Programming: direct\|light\|guarded\|full/);
-  assert.match(entrypoint, /state v2/);
-  assert.match(entrypoint, /\.ai-loop\/bin\/guard\.mjs/);
-  assert.match(planning, /project-specific OpenWhispr DoD/);
-  assert.match(planning, /Node 24/);
-  assert.match(planning, /Electron main\/preload\/IPC contract/);
-  assert.match(planning, /Native sidecar\/bundled binary/);
-  assert.match(programming, /project-specific OpenWhispr entrypoints/);
+test("planning schemas require evidence and competition", () => {
+  const planner = readJson(".ai-loop/schemas/planning-result.schema.json");
+  const final = readJson(".ai-loop/schemas/planning-final-result.schema.json");
+
+  assert.equal(planner.properties.evidence.minItems, 1);
+  assert.equal(planner.properties.proof_needed.minItems, 1);
+  assert.ok(JSON.stringify(planner.allOf ?? []).includes("reuse_lookup_log"));
+  assert.equal(final.properties.rejected_alternatives.minItems, 1);
 });
 
-test("full approval remains file-backed", () => {
-  for (const source of [
-    read("CLAUDE.md"),
-    read("docs/agent-planning-loop.md"),
-    read("docs/agent-programming-loop.md"),
-    read(".ai-loop/prompts/planning/handoff.md"),
-  ]) {
-    assert.match(source, /PLEASE IMPLEMENT THIS PLAN:/);
-  }
-  assert.match(read("docs/agent-programming-loop.md"), /input\/approved-plan\.md/);
+test("loop files name nothing from other repositories", () => {
+  // docs/agent-loop.md одинаков во всех репозиториях и намеренно не сверяется здесь.
+  const foreign = new RegExp(
+    [
+      "\\.codex/rules",
+      "php-" + "eggheads",
+      "open-code-" + "ai",
+      "development-" + "invariants",
+      "Open" + "Code",
+      "\\bPHP\\b",
+      "[Tt]enant UX",
+    ].join("|")
+  );
+  const files = [...walk(".ai-loop"), "docs/agent-planning-loop.md"];
+
+  assert.deepEqual(
+    files.filter((file) => foreign.test(read(file))),
+    []
+  );
+});
+
+test("no tracked reference to removed loop paths", () => {
+  // Строки собраны из частей, чтобы тест сам не был ссылкой. plans/ не входит в обход: это история.
+  const removed = new RegExp(
+    [
+      "guard\\.mjs",
+      "ai-loop-" + "guard",
+      "ai_loop_" + "guard",
+      "gate-" + "policy",
+      "gate-" + "cases",
+      "agent-" + "programming-loop",
+      "prompts/" + "programming",
+      "json-schema-" + "validator",
+      "(?:decision|loop-state|qa-result)\\.schema\\.json",
+    ].join("|")
+  );
+  const files = ["CLAUDE.md", "README.md", "package.json", ".ai-loop", ".github", "docs", "test"]
+    .flatMap(walk)
+    .filter((file) => /\.(?:json|md|mdc|mjs|js|yml)$/.test(file));
+
+  assert.ok(files.length > 0);
+  assert.deepEqual(
+    files.filter((file) => removed.test(read(file))),
+    []
+  );
 });

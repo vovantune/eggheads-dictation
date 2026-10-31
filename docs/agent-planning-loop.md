@@ -1,137 +1,20 @@
 # XP Planning Loop
 
+Запускается только по прямому слову пользователя в текущем диалоге; обычный порядок работы и обычный план — `docs/agent-loop.md`. Рекомендация агента, эффект из таблицы `critical` или правило репозитория этот протокол не включают.
+
 Этот документ описывает repo-native протокол планирования для задач, где важно получить не первую приличную идею, а выбранный synthesis после сравнения альтернатив по фактам, ограничениям и Definition of Done.
 
-Это не skill. Перед классификацией прочитай только `.ai-loop/gate-policy.json`; `.ai-loop/gate-cases.json` — regression fixture. Этот full-loop reference после раздела Gate читается только для Planning `full`.
+Это не skill. Документ читается только после прямого слова пользователя.
 
-После явного opt-in Full XP Planning Loop выполняется только при доступных независимых agents/subagents/agent threads. Если агент не может запустить независимых агентов, он обязан остановиться и сообщить пользователю, что full loop выполнить нельзя. Последовательное исполнение ролей одним агентом не является допустимым full loop и не должно маскироваться под независимое ревью.
+Full Planning Loop выполняется только при доступных независимых agents/subagents/agent threads. Если агент не может запустить независимых агентов, он обязан остановиться и сообщить пользователю, что full loop выполнить нельзя. Последовательное исполнение ролей одним агентом не является допустимым full loop и не должно маскироваться под независимое ревью.
 
-Этот файл сохраняет project-specific OpenWhispr DoD. Portable core синхронизируется byte-identical между development-agent repositories; локальные integration boundaries определяются `CLAUDE.md`.
+Этот файл сохраняет project-specific OpenWhispr DoD; локальные integration boundaries определяются `CLAUDE.md`.
 
-Full Planning Loop использует общий `.ai-loop` runtime contract вместе с Programming Loop. Для `full` чатовая история не является source of truth: долговременные решения, JSON-результаты, approved plan и handoff сохраняются в `.ai-loop/runs/<planning-run-id>/` и `plans/<task-slug>.md`. `lightweight` и `light` не создают эти artifacts.
+Чатовая история не является source of truth: долговременные решения, JSON-результаты и approved plan сохраняются в `.ai-loop/runs/<planning-run-id>/` и `plans/<task-slug>.md`. Прямая просьба пользователя сохранить рабочий план в `plans/` этот протокол не запускает: такой файл не становится approved plan и не создаёт `.ai-loop/runs`.
 
-## 0. Adaptive Gate v3
+## 0. Blocked: No Subagents
 
-Gate v3 классифицирует доказанные фактические effects, а не ключевые слова, имя файла, репозитория или количество строк. Перед планированием и реализацией независимо выбери:
-
-```text
-Planning: lightweight | light | full
-Programming: direct | light | guarded | full
-Proof: static | focused | contract | release
-Explicit loop request: ordinary|Programming Loop|light Programming Loop|full Planning Loop|full Programming Loop|full Planning + Programming Loop
-Scope: owner; source_of_truth; in_scope; out_of_scope; direct_consumers; rollback
-Hard effects: present|absent|unknown — ...
-Bounded change: yes|no|unknown — ...
-Independence need: none|independent_review|separation_of_duties|full_independent_cycle
-Resolved full planning to local fix: yes|no
-Risk groups: N/4 — design, reach, runtime, proof_rollback
-Unknowns: ...
-Why not full: ...   # обязательно для lightweight/light
-```
-
-Для `lightweight` decision остаётся компактно в чате. Programming `light` обязательно использует guard: transient `decision.json` и state лежат вне `.ai-loop/runs`. Для Programming `guarded/full` сохрани baseline как `input/decision.json`. Decision фиксирует profiles, admission decision/reason, scope hash, initial roles и фактические execution inputs; source of truth алгоритма остаётся только `.ai-loop/gate-policy.json`.
-
-Planning profile выбирается в таком порядке:
-
-1. Выполни bounded read-only discovery по репозиторию. Не повышай gate из-за слова `provider`, `auth`, `deployment`, `payload`, `session` или `UX`.
-2. Если доказан material/boundary hard effect, после discovery остается возможный hard effect либо насчитано три-четыре независимые risk groups, сформируй рекомендацию `full`.
-3. Если доказаны все bounded-change facts и hard effects отсутствуют, gate не выше `light`.
-4. Иначе считай только независимые risk groups. Коррелирующие опасения внутри одной группы считаются один раз.
-5. Без явного opt-in пользователя автоматический потолок — `light`: до создания artifacts и запуска ролей верни `HUMAN_DECISION_REQUIRED` и объясни, почему предлагается `full`.
-
-Planning `full` — только opt-in. Перед запросом разрешения назови точные effects/unknowns, почему `light` недостаточен, какие роли/artifacts/checks добавятся и какой более дешёвый вариант доступен. Repo-local правило, mandatory gate или собственная оценка риска не являются разрешением. Пользователь должен явно запросить `full Planning Loop` либо утвердить эту рекомендацию в текущем диалоге.
-
-Programming profile выбирается независимо:
-
-- `direct`: main реализует и проверяет, artifacts нет;
-- `light`: main реализует, один стабильный independent reviewer делает initial review и максимум один recheck, persisted run отсутствует;
-- `guarded`: один стабильный independent implementer и один стабильный independent reviewer используют compact run; тот же implementer исправляет, тот же reviewer перепроверяет;
-- `full`: сохраняется существующий independent implementer/fixer/fresh full-QA flow.
-
-Required Programming profile выводится из effects и `independence_need`: present/unresolved hard effect или `full_independent_cycle` может обосновать рекомендацию `full`; `separation_of_duties` требует `guarded`; `independent_review` требует `light`; `none` допускает `direct`. Если full planning снял критическую неизвестность и оставил bounded local fix без present/unresolved hard effect, доступен `guarded`. Planning `full` сам по себе Programming `full` не форсирует.
-
-Обычная просьба реализовать задачу не включает loop. Явный `Programming Loop` задаёт минимум `light`; `light Programming Loop` одновременно задаёт потолок `light`; `full Programming Loop` и `implement → full QA → fixes until pass` явно разрешают `full`. Без такого opt-in автоматический потолок — `guarded`: если факты рекомендуют `full`, верни `HUMAN_DECISION_REQUIRED`/`FULL_PROGRAMMING_OPT_IN_REQUIRED`, объясни добавочную стоимость и дождись решения. Потолок `light` по-прежнему даёт `LIGHT_PROFILE_CEILING`.
-
-Proof profile:
-
-- `static`: parse/syntax, readback, diff, wiring;
-- `focused`: существующая focused-проверка или один test для названного непокрытого failure mode;
-- `contract`: focused contract/integration check и применимый smoke;
-- `release`: full suite и post-deploy/live proof для широкого rollout, deployment, сложной migration или mandatory project gate.
-
-Full QA — независимая проверка существенных рисков и plan coverage, а не автоматический full suite.
-
-### Hard effects
-
-Material hard effects:
-
-- изменение persisted-state semantics, destructive DDL/backfill либо schema/migration с material lock, cross-version, consumer, rollout или сложным rollback risk;
-- изменение public/external API, payload, webhook, wire или backward-compatibility контракта;
-- изменение executable auth/authz/security/privacy/secret enforcement;
-- изменение billing, charging, quota accounting, balances, pricing или money semantics;
-- реальный риск data loss, money loss, privacy leak или destructive operation.
-
-Boundary hard effects:
-
-- изменение provider routing/wire behavior/externally meaningful model identity;
-- изменение deployment topology, production rollout или runtime ownership;
-- coordinated cross-service/repository state change;
-- rollback, требующий coordinated migration, rollout или state repair.
-
-Локальные provider label/copy/docs/metadata/config сами по себе не являются hard effect, если routing, wire, model identity, accounting, auth и external/state contracts сохранены.
-
-Имя DB/schema/migration/SQL/ORM файла само по себе не является hard effect. Additive nullable change без backfill, material lock, cross-version/consumer/rollout risk может оставаться `light/guarded/contract`; SQL/ORM bug с неизменными schema, payload и persisted semantics может оставаться `light/light/focused`.
-
-### Bounded change
-
-Bounded change доказан только когда одновременно верны все факты:
-
-- один runtime owner;
-- используется существующий source of truth;
-- external и persisted-state contracts сохранены;
-- security, accounting и provider routing сохранены;
-- rollback локален, а focused proof ловит изменяемое поведение.
-
-Bounded change не может перекрыть hard effect.
-
-### Independent risk groups
-
-- `design`: существенная неоднозначность решения, новая feature boundary или architecture decision;
-- `reach`: user/operator workflow или multi-module reach шире локальной presentation-правки;
-- `runtime`: performance/load/async/scheduler/sync/session-state/relay/degraded-runtime behavior;
-- `proof_rollback`: критическое поведение трудно доказать локально или rollback не является прямым bounded revert.
-
-Неизвестность не является дополнительной risk group. Сначала проверь evidence; unresolved possible hard effect означает blocking question или аргументированную рекомендацию `full`, но не автоматический запуск.
-
-### Lightweight
-
-Используй `lightweight`, когда hard effects отсутствуют, работа прямая и независимых risk groups нет.
-
-Для `lightweight` не читай full Planning protocol дальше, не запускай planning council и не создавай planning/plan/handoff artifacts. Дальнейшая реализация следует независимо выбранному Programming profile: обычный `direct` работает напрямую, а явный Programming Loop может потребовать одного reviewer.
-
-### Light
-
-Используй `light`, когда hard effects отсутствуют и доказан bounded change либо присутствуют одна-две независимые risk groups.
-
-Требования:
-
-- в чате кратко зафиксировать проверенные факты и выбранный подход;
-- назвать focused proof и локальный rollback/reversibility;
-- не запускать planning council/subagents;
-- не создавать `.ai-loop/runs`, `plans/...`, approved-plan или handoff artifacts;
-- не требовать отдельного approval сверх обычного пользовательского разрешения на изменение.
-
-Для Planning `light` не читай документ дальше. Если Programming profile — `light` или `guarded`, продолжай по `docs/agent-programming-loop.md`.
-
-### Full
-
-Planning `full` доступен только после явного opt-in пользователя. Present/unresolved hard effect или три-четыре независимые risk groups могут обосновать рекомендацию, но до разрешения запрещены planning artifacts, council и role dispatch.
-
-После opt-in для Planning `full` прочитай весь этот документ и выполни полноценный multiagent loop. Planning `full` не форсирует Programming `full`: доказанно bounded implementation может быть `guarded`, а full Programming требует отдельного opt-in.
-
-### Blocked: No Subagents
-
-Если Planning `full` уже выбран, но независимые agents/subagents недоступны, не выполняй single-agent simulation.
+Если full planning запрошен, но независимые agents/subagents недоступны, не выполняй single-agent simulation.
 
 Выведи:
 
@@ -149,8 +32,6 @@ Tracked runtime contract:
 ```text
 .ai-loop/
   config.yml
-  gate-policy.json
-  gate-cases.json
   schemas/
   prompts/
 ```
@@ -166,7 +47,6 @@ Full Planning run layout:
 ```text
 .ai-loop/runs/<planning-run-id>/
   manifest.json
-  state.json
   ledger.md
   input/
     task.md
@@ -175,7 +55,6 @@ Full Planning run layout:
   context/
     context-pack.md
   planning/
-    gate.json
     planners/
       reuse/result.md
       reuse/result.json
@@ -197,7 +76,6 @@ Full Planning run layout:
       final-result.json
   handoff/
     approved-plan-path.txt
-    programming-start-prompt.md
   final/
     summary.md
     verdict.json
@@ -209,19 +87,20 @@ Approved plan artifact:
 plans/<task-slug>.md
 ```
 
-`full` Planning Loop не считается завершенным, пока пользователь не утвердил итоговый synthesis и approved plan не сохранен в `plans/<task-slug>.md`. Для `lightweight/light` отдельное утверждение, artifact и handoff не требуются.
+Full Planning Loop не считается завершенным, пока пользователь не утвердил итоговый synthesis и approved plan не сохранен в `plans/<task-slug>.md`.
 
 ## 0.2 JSON Validation
 
-В `full` orchestrator валидирует все обязательные JSON-артефакты по schemas из `.ai-loop/config.yml`. Новые persisted runs используют `loop-state.schema.json` v2; завершённые v1 artifacts остаются historical read-only и не мигрируются:
+Orchestrator валидирует все обязательные JSON-артефакты по schemas из `.ai-loop/config.yml`:
 
 - planner results по `.ai-loop/schemas/planning-result.schema.json`;
 - reviewer results по `.ai-loop/schemas/planning-review-result.schema.json`;
 - final synthesis по `.ai-loop/schemas/planning-final-result.schema.json`;
-- loop state по `.ai-loop/schemas/loop-state.schema.json`;
 - subagent role contract по `.ai-loop/schemas/subagent-result.schema.json`.
 
-Validation работает fail-closed: невалидный JSON, missing required artifact или несовпадение severity/status переводит loop в `FAILED_RUNTIME` или `HUMAN_DECISION_REQUIRED`. Reviewer `verdict: pass` не завершает loop сам по себе, если schema validation, proof gates, approved plan artifact или handoff contract не выполнены.
+Статусы: `FAILED_RUNTIME` — сбой выполнения роли; `HUMAN_DECISION_REQUIRED` — решает пользователь.
+
+Постоянного валидатора нет: схемы проверяются разовым скриптом. Validation работает fail-closed: невалидный JSON, missing required artifact или несовпадение severity/status переводит loop в `FAILED_RUNTIME` или `HUMAN_DECISION_REQUIRED`. Reviewer `verdict: pass` не завершает loop сам по себе, если schema validation, proof gates или approved plan artifact не выполнены.
 
 ## 1. Context Pack
 
@@ -312,9 +191,9 @@ Alternatives должны быть materially distinct and feasible. Нельз�
 
 ## 3. Reviewers
 
-Для `full` reviewer checks выполняют отдельные reviewer agents; main orchestrator не подменяет их последовательным roleplay. `light` не входит в reviewer/council protocol и ограничивается compact chat proof из Gate.
+Reviewer checks выполняют отдельные reviewer agents; main orchestrator не подменяет их последовательным roleplay.
 
-YAGNI/Scope, Evidence/Contract и Project DoD reviewers запускаются всегда. Каждая применимая planner/reviewer role получает один initial pass и максимум один targeted rerun после invalidating plan change. Второй rerun, новая role или restart требуют `HUMAN_DECISION_REQUIRED`.
+YAGNI/Scope, Evidence/Contract и Project DoD reviewers запускаются всегда. Каждая применимая planner/reviewer role получает один initial pass и максимум один targeted rerun после invalidating plan change; оба pass записываются в `ledger.md`. Второй rerun, новая role или restart требуют `HUMAN_DECISION_REQUIRED`.
 
 Исключение допустимо только если reviewer не применим к задаче:
 
@@ -439,7 +318,7 @@ Proof plan должен быть матрицей, а не списком ком
 
 ## 6. Delta Review
 
-Если пользователь правит approved `full` plan, полный loop не повторяется автоматически. Для chat-only `lightweight/light` заново вычисли три профиля Gate v3; Delta Review artifact не нужен.
+Если пользователь правит approved plan, полный loop не повторяется автоматически.
 
 Delta Review:
 
@@ -449,19 +328,17 @@ Delta Review:
 - прогнать только затронутые planner/reviewer роли;
 - почти всегда включать YAGNI + Evidence;
 - включать Contract/DoD при изменении API/DB/deployment/UX;
-- повторить full loop, если меняется основной подход, owner, material effect или critical proof gate;
+- при изменении подхода, owner, effect или proof gate инвалидировать затронутое evidence и выполнить targeted discovery/rerun в бюджете уже явно выбранного full run; новый full run — только по отдельному текущему запросу человека;
 - соблюдать budget: одна targeted rerun на затронутую роль; следующий rerun, новая роль или restart требуют `HUMAN_DECISION_REQUIRED`;
 - `Delta Review skipped` допустим только если нет изменений в plan/code/config/docs/prompts/generated artifacts и пользователь не менял требования.
 
-## 6.1 Planning -> Programming Handoff
+## 6.1 После утверждения плана
 
-После утверждения `full` плана Planning Loop обязан подготовить handoff. `light` и `lightweight` не используют этот раздел:
+После утверждения плана orchestrator:
 
-1. Сохранить canonical approved plan в `plans/<task-slug>.md`.
-2. Сохранить путь к нему в `.ai-loop/runs/<planning-run-id>/handoff/approved-plan-path.txt`.
-3. Сохранить стартовый prompt в `.ai-loop/runs/<planning-run-id>/handoff/programming-start-prompt.md`.
-4. Если runtime умеет создавать clean session/thread в том же workspace, создать новую session и отправить туда минимальный prompt.
-5. Если runtime не умеет создавать clean session/thread, остановиться и показать человеку handoff prompt. Нельзя начинать implementation в загрязненном planning context.
+1. Сохраняет canonical approved plan в `plans/<task-slug>.md`.
+2. Сохраняет путь к нему в `.ai-loop/runs/<planning-run-id>/handoff/approved-plan-path.txt`.
+3. Передаёт реализацию в обычный цикл `docs/agent-loop.md`: план уже принят, источник истины для автора и QA — файл плана, а не история чата.
 
 ### Codex plan-button approval event
 
@@ -472,85 +349,34 @@ PLEASE IMPLEMENT THIS PLAN:
 <approved plan text>
 ```
 
-Для `full` такое сообщение считается пользовательским утверждением плана через UI, а не командой начинать реализацию из текста чата. Для `light` отдельный handoff не создается.
-
-Обязательный порядок:
-
-1. Извлечь approved plan text после `PLEASE IMPLEMENT THIS PLAN:`.
-2. Сохранить его как canonical artifact в `plans/<task-slug>.md`.
-3. Создать handoff artifacts: `approved-plan-path.txt` и `programming-start-prompt.md`.
-4. Запустить Programming Loop preflight по `docs/agent-programming-loop.md`.
-5. Если clean session/thread доступна и видит тот же checkout, отправить туда только минимальный handoff prompt.
-6. Если clean session/thread создается в отдельном worktree, сначала убедиться, что `plans/<task-slug>.md` и нужный `.ai-loop/runs/<planning-run-id>/handoff/` доступны в этом worktree; иначе остановиться и показать handoff prompt человеку.
-7. Не начинать implementation в текущем planning thread.
-
-Минимальный handoff prompt:
-
-```text
-Запусти Programming Loop по plans/<task-slug>.md
-```
-
-Если есть planning trace, добавь второй строкой:
-
-```text
-Planning trace: .ai-loop/runs/<planning-run-id>
-```
-
-Programming Loop при старте копирует approved plan в `input/approved-plan.md` своего run и фиксирует:
-
-```json
-{
-  "loop_type": "programming",
-  "approved_plan_path": "plans/<task-slug>.md",
-  "source_planning_run": ".ai-loop/runs/<planning-run-id>"
-}
-```
+Для full planning такое сообщение считается пользовательским утверждением плана через UI. Сначала сохрани текст после маркера как canonical artifact в `plans/<task-slug>.md`, затем продолжай по `docs/agent-loop.md`.
 
 ## 7. Acceptance And Dry Runs
 
 Planning Loop считается рабочим, если выполняются критерии:
 
-- Gate классифицирует effects по `.ai-loop/gate-policy.json`, а `.ai-loop/gate-cases.json` проходит как regression-матрица.
-- Planning `light` содержит compact approach, proof и rollback в чате без planning council, persisted planning run, approved-plan artifact или handoff.
-- `full` планы содержат competing approaches, выбранный подход и rejected alternatives.
+- Запуск только по прямому слову пользователя в текущем диалоге; рекомендация, эффект или repo-local gate сами по себе не запускают artifacts/roles.
+- Планы содержат competing approaches, выбранный подход и rejected alternatives.
 - Финальный выбор ссылается на факты и rubric, а не на "кажется лучше".
 - High-risk задачи содержат proof plan, failure semantics и rollback/reversibility.
 - План не предлагает менять исходники библиотек/зависимостей без явного approval.
 - UX-visible задачи содержат expected observable result.
 - DB/API задачи содержат project-specific generated docs/tests gates.
-- `lightweight` задачи не читают full protocol и не запускают council.
-- Gate фиксирует все три profiles; explicit Programming Loop для простой задачи даёт Programming `light`, а Planning `full` не форсирует Programming `full`.
-- Full Planning и full Programming запускаются только после независимых явных opt-in в текущем диалоге; рекомендация, hard effect или repo-local gate сами по себе не запускают artifacts/roles.
-- Каждая applicable full-planning role имеет один initial pass и максимум один targeted rerun. Оба pass записываются как ordered `activity.type=planning` с `role` и `pass=initial|rerun`; guard выводит budget из activity, поэтому CLI-флаг или сброс counter не может открыть дополнительный запуск.
-- Check Map запрещает duplicate check того же snapshot и full suite ниже `release`, кроме mandatory project gate.
-- Если full нужен, но subagents недоступны, агент останавливается с `blocked-no-subagents`.
-- Portable core остаётся byte-identical во всех repositories; локальные docs и project rules сохраняют OpenWhispr DoD.
-- Approved full handoff pass: `plans/<task-slug>.md` существует, planning run содержит `handoff/approved-plan-path.txt` и `handoff/programming-start-prompt.md`, а Programming Loop стартует в clean session или runtime fail-closed показывает prompt человеку.
-- Programming Loop runtime pass: если run содержит `fixes.md`, после него есть более поздний full QA `iterations/<N>/result.json`; latest QA event overall имеет `verdict: "pass"`, final ссылается именно на него, а после него нет implementation/fix/non-pass QA; `manifest.json.status`, `state.json.status` и final verdict согласованы.
+- Каждая applicable role имеет один initial pass и максимум один targeted rerun; оба pass записаны в `ledger.md`.
+- Если subagents недоступны, агент останавливается с `blocked-no-subagents`.
+- Завершение: `plans/<task-slug>.md` существует, planning run содержит `handoff/approved-plan-path.txt`, реализация идёт по `docs/agent-loop.md`.
 
 Минимальная dry-run матрица:
 
-| Prompt | Expected profiles |
+| Prompt | Expected outcome |
 | --- | --- |
-| Docs typo | `lightweight/direct/static` |
-| Простая задача с явным Programming Loop | `lightweight|light / light / static|focused` |
-| PHP controller или SQL/ORM bug без contract change | `light/light/focused` |
-| Additive nullable column без backfill/lock/consumer risk | `light/guarded/contract` |
-| Bounded Sentry env-wrapper | `light/guarded/contract` |
-| Provider label/copy | `lightweight/direct/static` |
-| «Изучи task/план и дай feedback» | `lightweight/direct/static` |
-| Provider selection/failover/model identity без full opt-in | `light/guarded/contract` + `FULL_PROGRAMMING_OPT_IN_REQUIRED` |
-| Rename/drop/backfill/multi-service migration без full opt-in | `light/guarded/release` + `FULL_PROGRAMMING_OPT_IN_REQUIRED` |
-| Глубокое исследование без full Planning opt-in | `light/guarded/focused|contract` + `FULL_PLANNING_OPT_IN_REQUIRED` |
-| Явный full Planning после аргументации | `full/direct|light|guarded/focused|contract` |
-| Явный full Planning + Programming для RC deploy | `full/full/release` |
-| "Не используй subagents, но запусти full Planning" | Planning outcome `blocked-no-subagents` после opt-in |
+| Сложная задача без прямого слова пользователя | Протокол не запускается; агент может предложить его одной строкой |
+| Прямое слово: full planning | Planners, reviewers, synthesis, approved plan после утверждения |
+| "Не используй subagents, но запусти full planning" | `blocked-no-subagents` |
 
 Dry-run verification contract:
 
-- Planning `lightweight` pass: нет planning council/artifacts; Programming `direct` не создаёт subagents, Programming `light` использует ровно одного reviewer.
-- Planning `light` pass: нет planning council, planning run, `plans/...` или handoff; Programming `light/guarded` следует отдельному protocol.
-- `full` pass: transcript содержит gate `full`; после gate есть чтение `docs/agent-planning-loop.md`; есть отдельные subagent/agent-thread calls для planners и reviewer agents; final plan содержит synthesis, а не только список мнений.
-- `blocked-no-subagents` pass: transcript содержит gate `blocked-no-subagents`; нет roleplay planners/reviewers; агент останавливается и объясняет, что full loop требует независимых agents/subagents.
-- OpenWhispr planning pass: successful `full` planning создаёт или называет `plans/...` artifact; `lightweight/light` остаются chat-only.
-- Delta Review pass: transcript называет changed scope, затронутые roles/checks и impact; смена подхода, owner, material effect или critical proof gate может обосновать full rerun, но он ждёт нового явного opt-in.
+- Pass: transcript содержит прямое слово пользователя и чтение `docs/agent-planning-loop.md`; есть отдельные subagent/agent-thread calls для planners и reviewer agents; final plan содержит synthesis, а не только список мнений.
+- `blocked-no-subagents` pass: нет roleplay planners/reviewers; агент останавливается и объясняет, что full loop требует независимых agents/subagents; plan-файл не создаётся.
+- OpenWhispr planning pass: successful full planning создаёт или называет `plans/...` artifact с итоговым synthesis.
+- Delta Review pass: transcript называет changed scope, затронутые roles/checks и impact; смена подхода, owner, effect или proof gate инвалидирует затронутое evidence и требует targeted discovery; новый full run возможен только по отдельному явному запросу человека.

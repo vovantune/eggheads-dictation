@@ -13,3 +13,4 @@ Block on:
 - missing API, DB, config, prompt, schema, I/O, compatibility, idempotency, or failure contract;
 - provider, quota, pricing, auth, model, wire-protocol, or upstream claims without primary evidence;
 - proof gates that do not catch the core risk.
+- effects from the `critical` table in `docs/agent-loop.md` without their reproducible named proof.
