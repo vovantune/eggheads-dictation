@@ -1,22 +1,13 @@
 # Planning Loop Handoff Prompt
 
-After user approval of a `full` plan, save the approved plan and prepare Programming Loop handoff. `light` and `lightweight` never use this prompt.
+After user approval of the plan, save it and hand implementation to `docs/agent-loop.md`.
 
 Required artifacts:
 
 - canonical approved plan: `plans/<task-slug>.md`;
 - runtime approved plan trace under `.ai-loop/runs/<planning-run-id>/`;
-- `.ai-loop/runs/<planning-run-id>/handoff/approved-plan-path.txt`;
-- `.ai-loop/runs/<planning-run-id>/handoff/programming-start-prompt.md`.
+- `.ai-loop/runs/<planning-run-id>/handoff/approved-plan-path.txt`.
 
-The Programming Loop start prompt must be minimal:
+The plan is accepted at this point; the file, not the chat history, is the source of truth for the author and QA.
 
-```text
-Запусти Programming Loop по plans/<task-slug>.md
-```
-
-Append the planning run path when available.
-
-If the user message starts with `PLEASE IMPLEMENT THIS PLAN:`, treat it as a Codex plan-button approval event. Save the plan text after the marker into `plans/<task-slug>.md`, write the handoff artifacts, and do not begin implementation in the current planning thread.
-
-Create a clean session only when it can read the same checkout, approved plan, and handoff trace. For a separate worktree, explicitly copy both artifacts and verify that the target paths are readable before sending the prompt. Otherwise stop and show the exact handoff prompt instead of starting implementation in the planning context.
+If the user message starts with `PLEASE IMPLEMENT THIS PLAN:`, treat it as a Codex plan-button approval event. Save the plan text after the marker into `plans/<task-slug>.md` first, then continue by `docs/agent-loop.md`.

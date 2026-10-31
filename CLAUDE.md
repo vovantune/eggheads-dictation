@@ -35,7 +35,7 @@
 - Transcription/audio: inspect recorder hooks, audio IPC, whisper/parakeet helpers, FFmpeg paths, and temp-file cleanup first.
 - UI/settings: inspect React components, settings store/hooks, shadcn/Radix usage, and existing layout conventions first.
 - Providers/models: inspect the model registry, provider registry, inference scopes, and source-of-truth config first.
-- Planning/Programming Loop: use the short links and protocols below; do not duplicate the full loop docs here.
+- Agent loop: use the short links and protocols below; do not duplicate the full loop docs here.
 
 # OpenWhispr Technical Reference for AI Assistants
 
@@ -48,29 +48,19 @@ OpenWhispr is an Electron-based desktop dictation application that uses whisper.
 ## Source of Truth
 
 - `CLAUDE.md` is the canonical assistant entrypoint for this repository; `AGENTS.md` is a compatibility symlink to it.
-- Portable Planning Loop classification is defined by `.ai-loop/gate-policy.json`; `.ai-loop/gate-cases.json` is a test fixture, not required runtime context.
-- Detailed full Planning/Programming Loop protocols live in `docs/agent-planning-loop.md`, `docs/agent-programming-loop.md`, and `.ai-loop/config.yml`.
+- The working cycle is defined by `docs/agent-loop.md`; full planning and its runtime wiring live in `docs/agent-planning-loop.md` and `.ai-loop/config.yml`.
 - Runtime loop artifacts go under ignored `.ai-loop/runs/`; approved `full` plans go under `plans/<task-slug>.md`.
-
-## Plan Mode: XP Planning Loop
-
-- In Plan Mode and before implementation, Gate v3 independently selects `Planning: lightweight|light|full`, `Programming: direct|light|guarded|full`, and `Proof: static|focused|contract|release` from `.ai-loop/gate-policy.json`.
-- `full` never starts automatically. Explain the exact effects, why the lighter ceiling is insufficient, the added roles/artifacts/checks, and the cheaper alternative, then return `HUMAN_DECISION_REQUIRED`. Full Planning and full Programming require separate explicit user opt-ins in the current dialog; a repo-local rule is not authorization.
-- Planning `lightweight/light` is chat-only without council, `.ai-loop/runs`, `plans/...`, separate approval, or handoff. Only Planning `full` requires an approved plan, and it does not force Programming `full`.
-- If `full` is recommended and the matching opt-in or approved plan is absent or stale, stop before edits and offer the full Planning Loop or Delta Review. If the user opts in but independent subagents are unavailable, report `blocked-no-subagents`.
-- After approval of a `full` plan, save it in `plans/<task-slug>.md`. If a clean session/thread is unavailable, show the handoff prompt from runtime artifacts and do not start implementation in polluted planning context.
-- `PLEASE IMPLEMENT THIS PLAN:` for Planning `full` remains a file-backed Codex plan-button approval event; do not start coding in the current planning thread.
 
 ## Agent Workflow
 
-- Ordinary implementation does not imply a Programming Loop. Explicit `Programming Loop` sets minimum `light`; `light Programming Loop` caps it at `light`; `full Programming Loop` and `implement -> full QA -> fixes until pass` explicitly authorize `full`. The `light` ceiling is checked before admitting a higher required profile; return `HUMAN_DECISION_REQUIRED` with the exact proposed profile instead of escalating silently.
-- In Programming `light`, main implements and one stable reviewer gets initial review plus one recheck through transient decision/state and the guard, without a persisted run. In `guarded/full`, main is orchestrator-only; `guarded` uses a stable pair and `full` preserves fixer/fresh QA.
-- Derive Programming from present/unresolved effects and `execution_facts.independence_need`, not from an output-shaped implementation label. Full planning may hand a resolved bounded local fix to `guarded`.
-- For `light`, keep transient decision/state outside `.ai-loop/runs`; for `guarded/full`, persist `input/decision.json` and state v2. Run `.ai-loop/bin/guard.mjs --decision ...` before role/check/budget/final admission: it independently derives the required Programming profile and reconstructs review, iteration, and planning-pass counters from ordered activity. Base limit is 5 and extensions require current-dialog approval in a continuous ledger.
+- Mode and cycle: `docs/agent-loop.md` — `direct`, `light` by default, `critical` by effects.
+- Process contract check, required before any commit touching the loop files: `npm run test:ai-loop`.
+- The author finishes the work and makes fixes personally; QA is a new, full pass every time, until `pass`. The limit is 5 passes.
+- `full` planning (`docs/agent-planning-loop.md`) runs only on the user's direct word.
+- Delegation follows `$delegate-by-risk` before a subagent is launched.
 - Keep the user UX chat-first: do not ask the user to manually run CLI commands or copy prompts. Commands may be used only as an internal runtime/check layer of the orchestrator.
 - Do not use manual/copy-paste fallback and do not simulate independent QA as sequential roles of one agent.
 - For medium/large tasks, first research context, then UX for user-visible changes, then design/spec; start implementation only after explicit user confirmation.
-- For tasks with broad reading, 3+ independent areas, UI QA, release/build risk, or work longer than 10-15 minutes, use subagents when the current mode allows it.
 - The Claude Code client injects a `heron_brook` system-prompt section carrying `Do not call the AgentTool unless the user requested it`. It overrides user configuration, including an explicit `allow` for `Task`, and has no official opt-out (anthropics/claude-code#80988). While that holds: if a task benefits from parallel subagents, say so in one line up front — how many, over which areas, and why — and wait for approval. One approval covers the rest of the current task; do not ask again per launch. Temporary workaround, remove once the client is fixed.
 - The main agent keeps scope, decisions, and final integration; give subagents only narrow independent tasks such as entrypoint search, module analysis, review, risk check, or verification.
 - Do not delegate sequential chains or parallel edits to the same file.
