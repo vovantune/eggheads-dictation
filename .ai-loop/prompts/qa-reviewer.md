@@ -39,7 +39,7 @@ Return a markdown report:
 Verdict rules:
 
 - Any unresolved `blocker`, `critical`, or `major` finding means `fail`.
-- `pass` requires complete plan coverage and no such finding. A `minor` finding does not block; the author fixes or names it.
+- `pass` requires complete plan coverage and no such finding. A `minor` finding does not block; the author may name it; any fix means a new QA pass.
 - Use `needs_human` only when the next step requires a user decision, such as scope or a dispute that facts did not resolve.
 - A preference without evidence does not block.
 - A passing report does not need to say that no findings were found.
