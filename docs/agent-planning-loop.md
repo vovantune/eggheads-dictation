@@ -100,7 +100,7 @@ Orchestrator валидирует все обязательные JSON-арте�
 
 Статусы: `FAILED_RUNTIME` — сбой выполнения роли; `HUMAN_DECISION_REQUIRED` — решает пользователь.
 
-Validation работает fail-closed: невалидный JSON, missing required artifact или несовпадение severity/status переводит loop в `FAILED_RUNTIME` или `HUMAN_DECISION_REQUIRED`. Reviewer `verdict: pass` не завершает loop сам по себе, если schema validation, proof gates или approved plan artifact не выполнены.
+Постоянного валидатора нет: схемы проверяются разовым скриптом. Validation работает fail-closed: невалидный JSON, missing required artifact или несовпадение severity/status переводит loop в `FAILED_RUNTIME` или `HUMAN_DECISION_REQUIRED`. Reviewer `verdict: pass` не завершает loop сам по себе, если schema validation, proof gates или approved plan artifact не выполнены.
 
 ## 1. Context Pack
 
