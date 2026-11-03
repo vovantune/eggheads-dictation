@@ -13,7 +13,7 @@ Include:
 - affected contracts: API, DB, config, UX, deployment, docs, prompts, schemas;
 - project-specific DoD and proof commands;
 - a Check Map for each risk or contract: stable check id, exact command/procedure, failure mode caught, input snapshot, invalidation triggers, and status;
-- when a change has an effect from the `critical` table in `docs/agent-loop.md`, a mandatory Check Map entry for its named proof;
+- when a change has an effect from the evidence table in `docs/agent-loop.md`, a mandatory Check Map entry for its named proof;
 - known unknowns that cannot be verified from the repository;
 - evidence links to files, commands, docs, or primary sources.
 

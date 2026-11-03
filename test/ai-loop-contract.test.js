@@ -18,14 +18,17 @@ const walk = (relativePath) => {
     .flatMap((name) => walk(path.join(relativePath, name)));
 };
 
-test("agent loop defines modes, stop rules and critical proofs", () => {
+test("agent loop defines modes, stop rules and effect proofs", () => {
   const loop = read("docs/agent-loop.md");
 
-  for (const mode of ["direct", "light", "critical"]) {
+  for (const mode of ["direct", "loop"]) {
     assert.match(loop, new RegExp(`^\\| \`${mode}\` \\|`, "m"));
   }
   for (const stopRule of [
-    "Лимит — 5 проходов QA",
+    "Лимит — 5 полных проходов QA",
+    "Перепроверки входят в свой проход",
+    "**Финальный QA.**",
+    "финальный — самая сильная доступная",
     "новый чат и сжатие контекста его не обнуляют",
     "Та же находка или тот же механизм вернулись",
     "После 10 проходов нужен другой подход",

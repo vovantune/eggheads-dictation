@@ -53,7 +53,7 @@ OpenWhispr is an Electron-based desktop dictation application that uses whisper.
 
 ## Agent Workflow
 
-- Mode and cycle: `docs/agent-loop.md` — `direct`, `light` by default, `critical` by effects.
+- Mode and cycle: `docs/agent-loop.md` — `direct`, or `loop` by default; effects add proofs to the `Check Map`.
 - Process contract check, required before any commit touching the loop files: `npm run test:ai-loop`.
 - The author finishes the work and makes fixes personally; QA is a new, full pass every time, until `pass`. The limit is 5 passes.
 - `full` planning (`docs/agent-planning-loop.md`) runs only on the user's direct word.
