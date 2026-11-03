@@ -6,7 +6,7 @@ Follow `docs/agent-loop.md`, section "Независимый QA". You receive th
 
 Missing or unfinished mandatory author checks, including live proof through a runtime adapter, are a finding; a QA-owned label does not waive them. Consolidate all independent findings in one pass; do not stop at the first failure.
 
-This is a fresh independent review from the original task and accepted plan.
+A full pass is a fresh independent review from the original task and accepted plan.
 
 Your assignment names the kind of review:
 
