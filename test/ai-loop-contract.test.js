@@ -215,7 +215,7 @@ test("no rule keeps the retired QA model", () => {
       "таблиц[аыe] " + "`critical`",
     ].join("|")
   );
-  const files = ["CLAUDE.md", ".ai-loop", "docs"]
+  const files = ["CLAUDE.md", ".ai-loop", ".github", "docs"]
     .flatMap(walk)
     .filter((file) => /\.(?:json|md|mdc|yml)$/.test(file));
 

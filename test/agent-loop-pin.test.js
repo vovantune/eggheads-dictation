@@ -6,7 +6,7 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 // docs/agent-loop.md is byte-identical across repositories: change it everywhere and update this hash.
-const AGENT_LOOP_SHA256 = "c4a63969e4fd50981b44d5ad06f0f8bc80bc565c8b24121af855e92f436c68e5";
+const AGENT_LOOP_SHA256 = "b2e3af48d8a79b130807934b8fe455d40546c44d438fd6576d7dfd21452182e1";
 
 test("agent loop keeps the shared version", () => {
   const digest = crypto.createHash("sha256").update(fs.readFileSync(path.join(root, "docs/agent-loop.md"))).digest("hex");
