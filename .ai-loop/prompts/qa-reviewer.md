@@ -57,7 +57,7 @@ Complexity and scope:
 
 ## Knowledge capture in final QA
 
-This step is as important as correctness (`docs/agent-loop.md`, "Сохранение знаний"). Every agent session starts without memory of earlier ones; only the repository carries knowledge forward. When the author spends effort rediscovering how something works (release and deploy mechanics, who consumes data, environment quirks, why a decision that looks redundant is needed) and that knowledge stays only in the chat, the next agent pays the same cost again and may get it wrong. Current `CLAUDE.md`, `docs/`, rules, and skills are what keep AI development here fast and safe.
+This step is as important as correctness (`docs/agent-loop.md`, "Сохранение знаний"). Every agent session starts without memory of earlier ones; only the repository carries knowledge forward. When the author spends effort rediscovering how something works (release and deploy mechanics, who consumes data, environment quirks, why a decision that looks redundant is needed) and that knowledge stays only in the chat, the next agent pays the same cost again and may get it wrong. Current `CLAUDE.md` and `docs/` are what keep AI development here fast and safe.
 
 In final QA:
 
