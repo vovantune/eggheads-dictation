@@ -50,6 +50,7 @@ OpenWhispr is an Electron-based desktop dictation application that uses whisper.
 - `CLAUDE.md` is the canonical assistant entrypoint for this repository; `AGENTS.md` is a compatibility symlink to it.
 - The working cycle is defined by `docs/agent-loop.md`; full planning and its runtime wiring live in `docs/agent-planning-loop.md` and `.ai-loop/config.yml`.
 - Runtime loop artifacts go under ignored `.ai-loop/runs/`; approved `full` plans go under `plans/<task-slug>.md`.
+- Durable knowledge that is expensive to rediscover and that the next agent will need (CI, release and deploy mechanics, environment quirks, external consumers, why a non-obvious decision stands) goes into the relevant section of `CLAUDE.md` or a focused `docs/*.md` linked from it, in the same change. Do not retell what a quick read of the code answers.
 
 ## Agent Workflow
 
