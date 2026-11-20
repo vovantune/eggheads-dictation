@@ -30,6 +30,7 @@ Review:
 - maintainability and unnecessary scope.
 - the Existing Analogue And Complexity Budget (`.ai-loop/prompts/shared/context-pack.md`) for every new parser, protocol, durable journal/state, recovery path, or control layer.
 - for every effect from the evidence table in `docs/agent-loop.md`, its named proof in the `Check Map`, reproducible and current under the repeat rule there.
+- in final QA, knowledge capture as described in the last section; it is not optional.
 
 You may run checks and a live run yourself, within this repository's rules (`CLAUDE.md`). You do not edit the change.
 
@@ -53,3 +54,15 @@ Complexity and scope:
 
 - Report `major` when a new durable state/control layer or recovery mechanism lacks proved incompatibility with the nearest working analogue, or when prevention costs more than the observed failure it avoids.
 - Report `major` for unrelated MR, branch, or consumer changes in the diff; this is blocking scope contamination, not harmless context.
+
+## Knowledge capture in final QA
+
+This step is as important as correctness (`docs/agent-loop.md`, "Сохранение знаний"). Every agent session starts without memory of earlier ones; only the repository carries knowledge forward. When the author spends effort rediscovering how something works (release and deploy mechanics, who consumes data, environment quirks, why a decision that looks redundant is needed) and that knowledge stays only in the chat, the next agent pays the same cost again and may get it wrong. Current `CLAUDE.md`, `docs/`, rules, and skills are what keep AI development here fast and safe.
+
+In final QA:
+
+- From the author's report (when your assignment includes it), the diff, and your own review path, list what the author or you had to rediscover, for example from CI, infrastructure, production, git history, experiments, or across several modules and repositories, because the repository lacks it or states it wrongly. This is your own analysis; do not stop to ask the author.
+- For each gap, name the file where it belongs under the project's documentation rules (`CLAUDE.md`) and the missing statement.
+- A gap that is expensive to rediscover and that the next agent working in this area will need again is `major`: handoff waits until the author updates the file. Facts that a quick read of the code answers are not gaps; documents must not retell code.
+- Knowledge that is truly one-off is `minor` or not a finding; say why you judge it one-off.
+- A document that the change makes wrong is `major`.

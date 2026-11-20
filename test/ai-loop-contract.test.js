@@ -82,6 +82,7 @@ test("QA reviewer prompt is a full markdown review under this repository's rules
 
   assert.ok(reviewer.includes("`docs/agent-loop.md`"));
   assert.ok(reviewer.includes("fresh independent review from the original task"));
+  assert.ok(reviewer.includes("## Knowledge capture in final QA"));
   assert.ok(reviewer.includes("`CLAUDE.md`"));
   assert.ok(!reviewer.includes("schema"));
 });
